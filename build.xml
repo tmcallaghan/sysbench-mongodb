@@ -1,0 +1,115 @@
+<?xml version="1.0" ?>
+<project name="generic ant script" default="default">
+    <property environment="env"/>
+    
+    <property name="build.dir" location="obj/"/>
+    <property name="src.dir" location="src/"/>
+    
+    <path id="project.classpath">
+        <pathelement location="${build.dir}"/>
+        <pathelement path="${java.class.path}"/>
+    </path>
+    
+    <macrodef name="invoke-java">
+        <attribute name="classname"/>
+        <element name="javac" optional="true" implicit="true"/>
+        <sequential>
+            <java classname="@{classname}" fork="yes" failonerror="true">
+                <jvmarg value="-server"/>
+                <jvmarg value="-Xmx512m"/>
+                <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
+                <jvmarg value="-XX:HeapDumpPath=/tmp"/>
+                <jvmarg value="-XX:-ReduceInitialCardMarks"/>
+                <classpath refid="project.classpath"/>
+                <assertions>
+                    <disable/>
+                </assertions>
+                <javac/>
+            </java>
+        </sequential>
+    </macrodef>
+    
+    <target name="default" depends="srccompile" description="Compile code."/>
+    
+    <target name="clean" description="Remove compilation artifacts">
+        <delete failonerror="false" includeemptydirs="true">
+            <fileset dir="${build.dir}" includes="**/*"/>
+        </delete>
+    </target>
+    
+    <target name="srccompile">
+        <mkdir dir="${build.dir}"/>
+        <javac srcdir="${src.dir}" destdir="${build.dir}" debug="true" target="1.6" includeantruntime="false">
+            <classpath refid="project.classpath"/>
+        </javac>
+    </target>
+    
+    <target name="load" description="Run loader.">
+        <fail unless="env.MONGO_TYPE" message="MONGO_TYPE not set."/>
+        <fail unless="env.DB_NAME" message="DB_NAME not set."/>
+        <fail unless="env.MONGO_COMPRESSION" message="MONGO_COMPRESSION not set."/>
+        <fail unless="env.MONGO_BASEMENT" message="MONGO_BASEMENT not set."/>
+        <fail unless="env.NUM_COLLECTIONS" message="NUM_COLLECTIONS not set."/>
+        <fail unless="env.NUM_LOADER_THREADS" message="NUM_LOADER_THREADS not set."/>
+        <fail unless="env.NUM_DOCUMENTS_PER_COLLECTION" message="NUM_DOCUMENTS_PER_COLLECTION not set."/>
+        <fail unless="env.NUM_DOCUMENTS_PER_INSERT" message="NUM_DOCUMENTS_PER_INSERT not set."/>
+        <fail unless="env.NUM_INSERTS_PER_FEEDBACK" message="NUM_INSERTS_PER_FEEDBACK not set."/>
+        <fail unless="env.NUM_SECONDS_PER_FEEDBACK" message="NUM_SECONDS_PER_FEEDBACK not set."/>
+        <fail unless="env.BENCHMARK_TSV" message="BENCHMARK_TSV not set."/>
+        
+        <invoke-java classname="jmongosysbenchload">
+            <arg value="${env.NUM_COLLECTIONS}"/>                <!-- number of collections -->
+            <arg value="${env.DB_NAME}"/>                        <!-- database name -->
+            <arg value="${env.NUM_LOADER_THREADS}"/>             <!-- number of writer threads -->
+            <arg value="${env.NUM_DOCUMENTS_PER_COLLECTION}"/>   <!-- documents to insert per collection -->
+            <arg value="${env.NUM_DOCUMENTS_PER_INSERT}"/>       <!-- documents per insert (bulk loading)  -->
+            <arg value="${env.NUM_INSERTS_PER_FEEDBACK}"/>       <!-- number of inserts between feedback/progress messages  -->
+            <arg value="${env.NUM_SECONDS_PER_FEEDBACK}"/>       <!-- number of seconds between feedback/progress messages  -->
+            <arg value="${env.BENCHMARK_TSV}"/>                  <!-- name of log file -->
+            <arg value="${env.MONGO_TYPE}"/>                     <!-- technology : mongo/tokumon -->
+            <arg value="${env.MONGO_COMPRESSION}"/>              <!-- compression type (if tokumon), valid values are lzma, quicklz, zlib, none -->
+            <arg value="${env.MONGO_BASEMENT}"/>                 <!-- basement node size (if tokumon), 131072 = 128K -->
+        </invoke-java>
+    </target>
+
+    <target name="execute" description="Run benchmark.">
+        <fail unless="env.NUM_COLLECTIONS" message="NUM_COLLECTIONS not set."/>
+        <fail unless="env.DB_NAME" message="DB_NAME not set."/>
+        <fail unless="env.NUM_WRITER_THREADS" message="NUM_WRITER_THREADS not set."/>
+        <fail unless="env.NUM_DOCUMENTS_PER_COLLECTION" message="NUM_DOCUMENTS_PER_COLLECTION not set."/>
+        <fail unless="env.NUM_SECONDS_PER_FEEDBACK" message="NUM_SECONDS_PER_FEEDBACK not set."/>
+        <fail unless="env.BENCHMARK_TSV" message="BENCHMARK_TSV not set."/>
+        <fail unless="env.MONGO_TYPE" message="MONGO_TYPE not set."/>
+        <fail unless="env.SYSBENCH_READ_ONLY" message="SYSBENCH_READ_ONLY not set."/>
+        <fail unless="env.RUN_TIME_SECONDS" message="RUN_TIME_SECONDS not set."/>
+        <fail unless="env.SYSBENCH_RANGE_SIZE" message="SYSBENCH_RANGE_SIZE not set."/>
+        <fail unless="env.SYSBENCH_POINT_SELECTS" message="SYSBENCH_POINT_SELECTS not set."/>
+        <fail unless="env.SYSBENCH_SIMPLE_RANGES" message="SYSBENCH_SIMPLE_RANGES not set."/>
+        <fail unless="env.SYSBENCH_SUM_RANGES" message="SYSBENCH_SUM_RANGES not set."/>
+        <fail unless="env.SYSBENCH_ORDER_RANGES" message="SYSBENCH_ORDER_RANGES not set."/>
+        <fail unless="env.SYSBENCH_DISTINCT_RANGES" message="SYSBENCH_DISTINCT_RANGES not set."/>
+        <fail unless="env.SYSBENCH_INDEX_UPDATES" message="SYSBENCH_INDEX_UPDATES not set."/>
+        <fail unless="env.SYSBENCH_NON_INDEX_UPDATES" message="SYSBENCH_NON_INDEX_UPDATES not set."/>
+        
+        <invoke-java classname="jmongosysbenchexecute">
+            <arg value="${env.NUM_COLLECTIONS}"/>                <!-- number of collections -->
+            <arg value="${env.DB_NAME}"/>                        <!-- database name -->
+            <arg value="${env.NUM_WRITER_THREADS}"/>             <!-- number of writer threads -->
+            <arg value="${env.NUM_DOCUMENTS_PER_COLLECTION}"/>   <!-- documents to insert per collection -->
+            <arg value="${env.NUM_SECONDS_PER_FEEDBACK}"/>       <!-- number of seconds between feedback/progress messages  -->
+            <arg value="${env.BENCHMARK_TSV}"/>                  <!-- name of log file -->
+            <arg value="${env.MONGO_TYPE}"/>                     <!-- technology : mongo/tokumon -->
+            <arg value="${env.SYSBENCH_READ_ONLY}"/>             <!-- read only benchmark : Y/N -->
+            <arg value="${env.RUN_TIME_SECONDS}"/>               <!-- number of seconds to run for -->
+            <arg value="${env.SYSBENCH_RANGE_SIZE}"/>            <!-- number of documents to retrieve for range queries -->
+            <arg value="${env.SYSBENCH_POINT_SELECTS}"/>         <!-- number of point selects per sysbench transaction -->
+            <arg value="${env.SYSBENCH_SIMPLE_RANGES}"/>         <!-- number of simple range queries per sysbench transaction -->
+            <arg value="${env.SYSBENCH_SUM_RANGES}"/>            <!-- numbber of summed range queries per sysbench transaction -->
+            <arg value="${env.SYSBENCH_ORDER_RANGES}"/>          <!-- number of ordered range queries per sysbench transaction -->
+            <arg value="${env.SYSBENCH_DISTINCT_RANGES}"/>       <!-- number of DISTINCT ranges queries per sysbench transaction -->
+            <arg value="${env.SYSBENCH_INDEX_UPDATES}"/>         <!-- number of indexed updates per sysbench transaction -->
+            <arg value="${env.SYSBENCH_NON_INDEX_UPDATES}"/>     <!-- number of non-indexed updates per sysbench transaction -->
+        </invoke-java>
+    </target>
+    
+</project>
