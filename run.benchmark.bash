@@ -28,7 +28,14 @@ if [ -z "$BENCHMARK_NUMBER" ]; then
     echo "Need to set BENCHMARK_NUMBER"
     exit 1
 fi
-
+if [ -z "$BENCH_ID" ]; then
+    echo "Need to set BENCH_ID"
+    exit 1
+fi
+if [ -z "$MONGO_REPLICATION" ]; then
+    echo "Need to set MONGO_REPLICATION"
+    exit 1
+fi
 
 if [ -z "$NUM_SECONDS_PER_FEEDBACK" ]; then
     export NUM_SECONDS_PER_FEEDBACK=10
@@ -81,6 +88,23 @@ ant clean default
 export MINI_LOG_NAME=${MACHINE_NAME}-mongoSysbenchExecute-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${MONGO_TYPE}
 export MONGO_LOG=${MINI_LOG_NAME}.mongolog
 
+if [ ${MONGO_TYPE} == "tokumon" ]; then
+    if [ ${COMMIT_SYNC} == "1" ]; then
+        BENCH_ID=${BENCH_ID}-SYNC_COMMIT
+    else
+        BENCH_ID=${BENCH_ID}-NOSYNC_COMMIT
+    fi
+else
+    BENCH_ID=${BENCH_ID}
+fi
+
+# $MONGO_REPL must be set to something for the server to start in replication mode
+if [ ${MONGO_REPLICATION} == "Y" ]; then
+    export MONGO_REPL="tmcRepl"
+else
+    unset MONGO_REPL
+fi
+
 echo "`date` | starting the ${MONGO_TYPE} server at ${MONGO_DIR}"
 if [ ${MONGO_TYPE} == "tokumon" ]; then
     mongo-start-tokumon-fork
@@ -91,6 +115,11 @@ fi
 mongo-is-up
 echo "`date` | server is available"
 
+# make sure replication is started
+if [ ${MONGO_REPLICATION} == "Y" ]; then
+    mongo-start-replication
+fi
+
 for threadCount in ${threadCountList}; do
     export NUM_WRITER_THREADS=$threadCount
 
@@ -99,14 +128,11 @@ for threadCount in ${threadCountList}; do
     if [ ${MONGO_TYPE} == "tokumon" ]; then
         if [ ${COMMIT_SYNC} == "1" ]; then
             LOG_NAME=${MINI_LOG_NAME}-SYNC_COMMIT.log
-            BENCH_ID=${MINI_LOG_NAME}-SYNC_COMMIT
         else
             LOG_NAME=${MINI_LOG_NAME}-NOSYNC_COMMIT.log
-            BENCH_ID=${MINI_LOG_NAME}-NOSYNC_COMMIT
         fi
     else
         LOG_NAME=${MINI_LOG_NAME}.log
-        BENCH_ID=${MINI_LOG_NAME}
     fi
         
     export BENCHMARK_TSV=${LOG_NAME}.tsv
@@ -147,7 +173,7 @@ echo "`date` | post-load sizing (SizeMB / ASizeMB) = ${SIZE_MB} / ${SIZE_APPAREN
 
 if [ ${SCP_FILES} == "Y" ]; then
     DATE=`date +"%Y%m%d%H%M%S"`
-    tarFileName="${MACHINE_NAME}-${BENCHMARK_NUMBER}-${DATE}-mongoSysbench-${BENCH_ID}.tar.gz"
+    tarFileName="${MACHINE_NAME}-${BENCHMARK_NUMBER}-${DATE}-mongoSysbench-${BENCH_ID}${BENCHMARK_SUFFIX}.tar.gz"
 
     tar czvf ${tarFileName} ${MACHINE_NAME}*
     scp ${tarFileName} tcallaghan@192.168.1.242:~

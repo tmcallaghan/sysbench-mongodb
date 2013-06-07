@@ -36,6 +36,10 @@ if [ -z "$DB_NAME" ]; then
     echo "Need to set DB_NAME"
     exit 1
 fi
+if [ -z "$MONGO_REPLICATION" ]; then
+    echo "Need to set MONGO_REPLICATION"
+    exit 1
+fi
 
 if [ -z "$NUM_INSERTS_PER_FEEDBACK" ]; then
     export NUM_INSERTS_PER_FEEDBACK=100000
@@ -73,9 +77,13 @@ LOG_NAME_IOSTAT=${LOG_NAME}.iostat
 rm -f $LOG_NAME
 rm -f $BENCHMARK_TSV
 
-echo "`date` | wiping existing data folder at ${MONGO_DATA_DIR}" | tee -a $LOG_NAME
-mongo-clean
-    
+# $MONGO_REPL must be set to something for the server to start in replication mode
+#if [ ${MONGO_REPLICATION} == "Y" ]; then
+#    export MONGO_REPL="tmcRepl"
+#else
+    unset MONGO_REPL
+#fi
+
 echo "`date` | starting the ${MONGO_TYPE} server at ${MONGO_DIR}" | tee -a $LOG_NAME
 if [ ${MONGO_TYPE} == "tokumon" ]; then
     mongo-start-tokumon-fork
@@ -85,6 +93,11 @@ fi
     
 mongo-is-up
 echo "`date` | server is available" | tee -a $LOG_NAME
+
+# make sure replication is started, generally you don't want to do it for the loader
+#if [ ${MONGO_REPLICATION} == "Y" ]; then
+#    mongo-start-replication
+#fi
 
 iostat -dxm $IOSTAT_INTERVAL $IOSTAT_ROUNDS  > $LOG_NAME_IOSTAT &
     
