@@ -16,7 +16,7 @@ export NUM_COLLECTIONS=16
 
 # number of documents to maintain per collection
 #   valid values : integer > 0
-export NUM_DOCUMENTS_PER_COLLECTION=100000
+export NUM_DOCUMENTS_PER_COLLECTION=10000000
 
 # total number of documents to insert per "batch"
 #   valid values : integer > 0
@@ -32,7 +32,7 @@ export NUM_WRITER_THREADS=64
 
 # run the benchmark for this many minutes
 #   valid values : intever > 0
-export RUN_TIME_MINUTES=2
+export RUN_TIME_MINUTES=10
 export RUN_TIME_SECONDS=$[RUN_TIME_MINUTES*60]
 
 # database in which to run the benchmark
