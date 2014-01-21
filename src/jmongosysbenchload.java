@@ -43,6 +43,9 @@ public class jmongosysbenchload {
     public static int basementSize;
     public static String logFileName;
     public static String indexTechnology;
+    public static String myWriteConcern;
+    public static String serverName;
+    public static int serverPort;
     
     public static int allDone = 0;
     
@@ -50,9 +53,9 @@ public class jmongosysbenchload {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 11) {
+        if (args.length != 13) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [technology = mongo|tokumon] [compression type] [basement node size (bytes)]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port]");
             System.exit(1);
         }
         
@@ -64,9 +67,33 @@ public class jmongosysbenchload {
         insertsPerFeedback = Long.valueOf(args[5]);
         secondsPerFeedback = Long.valueOf(args[6]);
         logFileName = args[7];
-        indexTechnology = args[8];
-        compressionType = args[9];
-        basementSize = Integer.valueOf(args[10]);
+        compressionType = args[8];
+        basementSize = Integer.valueOf(args[9]);
+        myWriteConcern = args[10];
+        serverName = args[11];
+        serverPort = Integer.valueOf(args[12]);
+        
+        WriteConcern myWC = new WriteConcern();
+        if (myWriteConcern.toLowerCase().equals("fsync_safe")) {
+            myWC = WriteConcern.FSYNC_SAFE;
+        }
+        else if ((myWriteConcern.toLowerCase().equals("none"))) {
+            myWC = WriteConcern.NONE;
+        }
+        else if ((myWriteConcern.toLowerCase().equals("normal"))) {
+            myWC = WriteConcern.NORMAL;
+        }
+        else if ((myWriteConcern.toLowerCase().equals("replicas_safe"))) {
+            myWC = WriteConcern.REPLICAS_SAFE;
+        }
+        else if ((myWriteConcern.toLowerCase().equals("safe"))) {
+            myWC = WriteConcern.SAFE;
+        } 
+        else {
+            logMe("*** ERROR : WRITE CONCERN ISSUE ***");
+            logMe("  write concern %s is not supported",myWriteConcern);
+            System.exit(1);
+        }
         
         logMe("Application Parameters");
         logMe("--------------------------------------------------");
@@ -78,9 +105,38 @@ public class jmongosysbenchload {
         logMe("  Feedback every %,d seconds(s)",secondsPerFeedback);
         logMe("  Feedback every %,d inserts(s)",insertsPerFeedback);
         logMe("  logging to file %s",logFileName);
+        logMe("  write concern = %s",myWriteConcern);
+        logMe("  Server:Port = %s:%d",serverName,serverPort);
+
+        MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
+        ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
+        MongoClient m = new MongoClient(srvrAdd, clientOptions);
+
+        logMe("mongoOptions | " + m.getMongoOptions().toString());
+        logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
+
+        DB db = m.getDB(dbName);
+
+        // determine server type : mongo or tokumx
+        DBObject checkServerCmd = new BasicDBObject();
+        CommandResult commandResult = db.command("buildInfo");
+
+        // check if tokumxVersion exists, otherwise assume mongo
+        if (commandResult.toString().contains("tokumxVersion")) {
+            indexTechnology = "tokumx";
+        }
+        else
+        {
+            indexTechnology = "mongo";
+        }
+
         logMe("  index technology = %s",indexTechnology);
-        logMe("  compression type = %s",compressionType);
-        logMe("  basement node size (bytes) = %d",basementSize);
+
+        if (indexTechnology.toLowerCase().equals("tokumx")) {
+            logMe("  + compression type = %s",compressionType);
+            logMe("  + basement node size (bytes) = %d",basementSize);
+        }
+
         logMe("--------------------------------------------------");
 
         try {
@@ -89,19 +145,11 @@ public class jmongosysbenchload {
             e.printStackTrace();
         }
 
-        if ((!indexTechnology.toLowerCase().equals("tokumon")) && (!indexTechnology.toLowerCase().equals("mongo"))) {
+        if ((!indexTechnology.toLowerCase().equals("tokumx")) && (!indexTechnology.toLowerCase().equals("mongo"))) {
             // unknown index technology, abort
             logMe(" *** Unknown Indexing Technology %s, shutting down",indexTechnology);
             System.exit(1);
         }
-
-        MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).writeConcern(WriteConcern.FSYNC_SAFE).build();
-        MongoClient m = new MongoClient("localhost", clientOptions);
-        
-        logMe("mongoOptions | " + m.getMongoOptions().toString());
-        logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
-        
-        DB db = m.getDB(dbName);
         
         jmongosysbenchload t = new jmongosysbenchload();
 
@@ -199,7 +247,7 @@ public class jmongosysbenchload {
         public void run() {
             String collectionName = "sbtest" + Integer.toString(collectionNumber);
             
-            if (indexTechnology.toLowerCase().equals("tokumon")) {
+            if (indexTechnology.toLowerCase().equals("tokumx")) {
                 DBObject cmd = new BasicDBObject();
                 cmd.put("create", collectionName);
                 cmd.put("compression", compressionType);
@@ -216,15 +264,19 @@ public class jmongosysbenchload {
                 System.exit(1);
             }
 
+logMe("Writer thread %d : creating collection %s",threadNumber, collectionName);
+
             DBCollection coll = db.getCollection(collectionName);
         
             BasicDBObject idxOptions = new BasicDBObject();
-            idxOptions.put("background","true");
+            idxOptions.put("background",false);
         
-            if (indexTechnology.toLowerCase().equals("tokumon")) {
+            if (indexTechnology.toLowerCase().equals("tokumx")) {
                 idxOptions.put("compression",compressionType);
                 idxOptions.put("readPageSize",basementSize);
             }
+
+logMe("Writer thread %d : creating collection %s secondary index",threadNumber, collectionName);
 
             coll.ensureIndex(new BasicDBObject("k", 1), idxOptions);
             

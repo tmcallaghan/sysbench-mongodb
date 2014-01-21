@@ -49,6 +49,11 @@ public class jmongosysbenchexecute {
     public static String indexTechnology;
     public static String readOnly;
     public static int runSeconds;
+    public static String myWriteConcern;
+    public static Integer maxTPS;
+    public static Integer maxThreadTPS;
+    public static String serverName;
+    public static int serverPort;
     
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -58,6 +63,8 @@ public class jmongosysbenchexecute {
     public static int oltpDistinctRanges;
     public static int oltpIndexUpdates;
     public static int oltpNonIndexUpdates;
+
+    public static boolean bIsTokuMX = false;
     
     public static int allDone = 0;
     
@@ -65,11 +72,11 @@ public class jmongosysbenchexecute {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 17) {
+        if (args.length != 20) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
-                                   "[log file name] [technology = mongo|tokumon] [read only Y/N] [runtime (seconds)] [range size] [point selects] "+
-                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates]");
+                                   "[log file name] [read only Y/N] [runtime (seconds)] [range size] [point selects] "+
+                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [writeconcern] [max tps] [server] [port]");
             System.exit(1);
         }
         
@@ -79,17 +86,44 @@ public class jmongosysbenchexecute {
         numMaxInserts = Integer.valueOf(args[3]);
         secondsPerFeedback = Long.valueOf(args[4]);
         logFileName = args[5];
-        indexTechnology = args[6];
-        readOnly = args[7];
-        runSeconds = Integer.valueOf(args[8]);
-        oltpRangeSize = Integer.valueOf(args[9]);
-        oltpPointSelects = Integer.valueOf(args[10]);
-        oltpSimpleRanges = Integer.valueOf(args[11]);
-        oltpSumRanges = Integer.valueOf(args[12]);
-        oltpOrderRanges = Integer.valueOf(args[13]);
-        oltpDistinctRanges = Integer.valueOf(args[14]);
-        oltpIndexUpdates = Integer.valueOf(args[15]);
-        oltpNonIndexUpdates = Integer.valueOf(args[16]);
+        readOnly = args[6];
+        runSeconds = Integer.valueOf(args[7]);
+        oltpRangeSize = Integer.valueOf(args[8]);
+        oltpPointSelects = Integer.valueOf(args[9]);
+        oltpSimpleRanges = Integer.valueOf(args[10]);
+        oltpSumRanges = Integer.valueOf(args[11]);
+        oltpOrderRanges = Integer.valueOf(args[12]);
+        oltpDistinctRanges = Integer.valueOf(args[13]);
+        oltpIndexUpdates = Integer.valueOf(args[14]);
+        oltpNonIndexUpdates = Integer.valueOf(args[15]);
+        myWriteConcern = args[16];
+        maxTPS = Integer.valueOf(args[17]);
+        serverName = args[18];
+        serverPort = Integer.valueOf(args[19]);
+
+        maxThreadTPS = (maxTPS / writerThreads) + 1;
+        
+        WriteConcern myWC = new WriteConcern();
+        if (myWriteConcern.toLowerCase().equals("fsync_safe")) {
+            myWC = WriteConcern.FSYNC_SAFE;
+        }
+        else if ((myWriteConcern.toLowerCase().equals("none"))) {
+            myWC = WriteConcern.NONE;
+        }
+        else if ((myWriteConcern.toLowerCase().equals("normal"))) {
+            myWC = WriteConcern.NORMAL;
+        }
+        else if ((myWriteConcern.toLowerCase().equals("replicas_safe"))) {
+            myWC = WriteConcern.REPLICAS_SAFE;
+        }
+        else if ((myWriteConcern.toLowerCase().equals("safe"))) {
+            myWC = WriteConcern.SAFE;
+        } 
+        else {
+            logMe("*** ERROR : WRITE CONCERN ISSUE ***");
+            logMe("  write concern %s is not supported",myWriteConcern);
+            System.exit(1);
+        }
     
         logMe("Application Parameters");
         logMe("-------------------------------------------------------------------------------------------------");
@@ -99,7 +133,6 @@ public class jmongosysbenchexecute {
         logMe("  documents per collection = %,d",numMaxInserts);
         logMe("  feedback seconds         = %,d",secondsPerFeedback);
         logMe("  log file                 = %s",logFileName);
-        logMe("  index technology         = %s",indexTechnology);
         logMe("  read only                = %s",readOnly);
         logMe("  run seconds              = %d",runSeconds);
         logMe("  oltp range size          = %d",oltpRangeSize);
@@ -110,6 +143,34 @@ public class jmongosysbenchexecute {
         logMe("  oltp distinct ranges     = %d",oltpDistinctRanges);
         logMe("  oltp index updates       = %d",oltpIndexUpdates);
         logMe("  oltp non index updates   = %d",oltpNonIndexUpdates);
+        logMe("  write concern            = %s",myWriteConcern);
+        logMe("  maximum tps (global)     = %d",maxTPS);
+        logMe("  maximum tps (per thread) = %d",maxThreadTPS);
+        logMe("  Server:Port = %s:%d",serverName,serverPort);
+
+        MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
+        ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
+        MongoClient m = new MongoClient(srvrAdd, clientOptions);
+
+        logMe("mongoOptions | " + m.getMongoOptions().toString());
+        logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
+
+        DB db = m.getDB(dbName);
+
+        // determine server type : mongo or tokumx
+        DBObject checkServerCmd = new BasicDBObject();
+        CommandResult commandResult = db.command("buildInfo");
+
+        // check if tokumxVersion exists, otherwise assume mongo
+        if (commandResult.toString().contains("tokumxVersion")) {
+            indexTechnology = "tokumx";
+        }
+        else
+        {
+            indexTechnology = "mongo";
+        }
+
+        logMe("  index technology         = %s",indexTechnology);
         logMe("-------------------------------------------------------------------------------------------------");
 
         try {
@@ -118,22 +179,16 @@ public class jmongosysbenchexecute {
             e.printStackTrace();
         }
 
-        if ((!indexTechnology.toLowerCase().equals("tokumon")) && (!indexTechnology.toLowerCase().equals("mongo"))) {
+        if ((!indexTechnology.toLowerCase().equals("tokumx")) && (!indexTechnology.toLowerCase().equals("mongo"))) {
             // unknown index technology, abort
             logMe(" *** Unknown Indexing Technology %s, shutting down",indexTechnology);
             System.exit(1);
         }
+        
+        if (indexTechnology.toLowerCase().equals("tokumx")) {
+            bIsTokuMX = true;
+        }
 
-        MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).writeConcern(WriteConcern.FSYNC_SAFE).build();
-        //clientOptions.connectionsPerHost = 2048;
-        //m.setWriteConcern(WriteConcern.NORMAL);
-        MongoClient m = new MongoClient("localhost", clientOptions);
-        
-        logMe("mongoOptions | " + m.getMongoOptions().toString());
-        logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
-        
-        DB db = m.getDB(dbName);
-        
         jmongosysbenchexecute t = new jmongosysbenchexecute();
 
         Thread[] tWriterThreads = new Thread[writerThreads];
@@ -193,195 +248,234 @@ public class jmongosysbenchexecute {
         public void run() {
             logMe("Writer thread %d : started",threadNumber);
             globalWriterThreads.incrementAndGet();
+
+            long numTransactions = 0;
+            long numLastTransactions = 0;
+            long nextMs = System.currentTimeMillis() + 1000;
             
             while (allDone == 0) {
+                if ((numTransactions - numLastTransactions) >= maxThreadTPS) {
+                    // pause until a second has passed
+                    while (System.currentTimeMillis() < nextMs) {
+                        try {
+                            Thread.sleep(20);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    numLastTransactions = numTransactions;
+                    nextMs = System.currentTimeMillis() + 1000;
+                }
+
+                // if TokuMX, lock onto current connection (do not pool)
+                if (bIsTokuMX) {
+                    db.requestStart();
+                    db.command("beginTransaction");
+                }
+                
                 String collectionName = "sbtest" + Integer.toString(rand.nextInt(numCollections)+1);
                 DBCollection coll = db.getCollection(collectionName);
                 
-                for (int i=1; i <= oltpPointSelects; i++) {
-                    //for i=1, oltp_point_selects do
-                    //   rs = db_query("SELECT c FROM ".. table_name .." WHERE id=" .. sb_rand(1, oltp_table_size))
-                    //end
-                    
-                    // db.sbtest8.find({_id: 554312}, {c: 1, _id: 0})
-                    
-                    int startId = rand.nextInt(numMaxInserts)+1;
-
-                    BasicDBObject query = new BasicDBObject("_id", startId);
-                    BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
-                    
-                    DBObject myDoc = coll.findOne(query, columns);
-                    //System.out.println(myDoc);
-                    
-                    globalPointQueries.incrementAndGet();
-                }
-                
-                for (int i=1; i <= oltpSimpleRanges; i++) {
-                    //for i=1, oltp_simple_ranges do
-                    //   range_start = sb_rand(1, oltp_table_size)
-                    //   rs = db_query("SELECT c FROM ".. table_name .." WHERE id BETWEEN " .. range_start .. " AND " .. range_start .. "+" .. oltp_range_size - 1)
-                    //end
-                   
-                    //db.sbtest8.find({_id: {$gte: 5523412, $lte: 5523512}}, {c: 1, _id: 0})
-                   
-                    int startId = rand.nextInt(numMaxInserts)+1;
-                    int endId = startId + oltpRangeSize - 1;
-                   
-                    BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
-                    BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
-                    DBCursor cursor = coll.find(query, columns);
-                    try {
-                        while(cursor.hasNext()) {
-                            cursor.next();
-                            //System.out.println(cursor.next());
-                        }
-                    } finally {
-                        cursor.close();
+                try {
+                    if (bIsTokuMX) {
+                        // make sure a connection is available, given that we are not pooling
+                        db.requestEnsureConnection();
                     }
                     
-                    globalRangeQueries.incrementAndGet();
-                }
-
-                for (int i=1; i <= oltpSumRanges; i++) {
-                    //for i=1, oltp_sum_ranges do
-                    //   range_start = sb_rand(1, oltp_table_size)
-                    //   rs = db_query("SELECT SUM(K) FROM ".. table_name .." WHERE id BETWEEN " .. range_start .. " AND " .. range_start .. "+" .. oltp_range_size - 1)
-                    //end
-                   
-                    //db.sbtest8.aggregate([ {$match: {_id: {$gt: 5523412, $lt: 5523512}}}, { $group: { _id: null, total: { $sum: "$k"}} } ])   
-
-                    int startId = rand.nextInt(numMaxInserts)+1;
-                    int endId = startId + oltpRangeSize - 1;
-
-                    // create our pipeline operations, first with the $match
-                    DBObject match = new BasicDBObject("$match", new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId)));
-                    
-                    // build the $projection operation
-                    DBObject fields = new BasicDBObject("k", 1);
-                    fields.put("_id", 0);
-                    DBObject project = new BasicDBObject("$project", fields );
-                    
-                    // Now the $group operation
-                    DBObject groupFields = new BasicDBObject( "_id", null);
-                    groupFields.put("average", new BasicDBObject( "$sum", "$k"));
-                    DBObject group = new BasicDBObject("$group", groupFields);
-                    
-                    // run aggregation
-                    AggregationOutput output = coll.aggregate( match, project, group );
-                    
-                    //System.out.println(output.getCommandResult());
-
-                    globalRangeQueries.incrementAndGet();
-                }
-               
-                for (int i=1; i <= oltpOrderRanges; i++) {
-                    //for i=1, oltp_order_ranges do
-                    //   range_start = sb_rand(1, oltp_table_size)
-                    //   rs = db_query("SELECT c FROM ".. table_name .." WHERE id BETWEEN " .. range_start .. " AND " .. range_start .. "+" .. oltp_range_size - 1 .. " ORDER BY c")
-                    //end
-                
-                    //db.sbtest8.find({_id: {$gte: 5523412, $lte: 5523512}}, {c: 1, _id: 0}).sort({c: 1})
-                    
-                    int startId = rand.nextInt(numMaxInserts)+1;
-                    int endId = startId + oltpRangeSize - 1;
-                   
-                    BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
-                    BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
-                    DBCursor cursor = coll.find(query, columns).sort(new BasicDBObject("c",1));
-                    try {
-                        while(cursor.hasNext()) {
-                            cursor.next();
-                            //System.out.println(cursor.next());
-                        }
-                    } finally {
-                        cursor.close();
-                    }
-                    
-                    globalRangeQueries.incrementAndGet();
-                }
-            
-                for (int i=1; i <= oltpDistinctRanges; i++) {
-                    //for i=1, oltp_distinct_ranges do
-                    //   range_start = sb_rand(1, oltp_table_size)
-                    //   rs = db_query("SELECT DISTINCT c FROM ".. table_name .." WHERE id BETWEEN " .. range_start .. " AND " .. range_start .. "+" .. oltp_range_size - 1 .. " ORDER BY c")
-                    //end
-                   
-                    //db.sbtest8.distinct("c",{_id: {$gt: 5523412, $lt: 5523512}}).sort()
-                    
-                    int startId = rand.nextInt(numMaxInserts)+1;
-                    int endId = startId + oltpRangeSize - 1;
-                   
-                    BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
-                    BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
-                    List lstDistinct = coll.distinct("c", query);
-                    //System.out.println(lstDistinct.toString());
-                    
-                    globalRangeQueries.incrementAndGet();
-                }
-                
-            
-                if (readOnly.toLowerCase().equals("n")) {
-                    for (int i=1; i <= oltpIndexUpdates; i++) {
-                        //for i=1, oltp_index_updates do
-                        //   rs = db_query("UPDATE " .. table_name .. " SET k=k+1 WHERE id=" .. sb_rand(1, oltp_table_size))
+                    for (int i=1; i <= oltpPointSelects; i++) {
+                        //for i=1, oltp_point_selects do
+                        //   rs = db_query("SELECT c FROM ".. table_name .." WHERE id=" .. sb_rand(1, oltp_table_size))
                         //end
-
-                        //db.sbtest8.update({_id: 5523412}, {$inc: {k: 1}}, false, false)
+                        
+                        // db.sbtest8.find({_id: 554312}, {c: 1, _id: 0})
+                        
+                        int startId = rand.nextInt(numMaxInserts)+1;
+    
+                        BasicDBObject query = new BasicDBObject("_id", startId);
+                        BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
+                        
+                        DBObject myDoc = coll.findOne(query, columns);
+                        //System.out.println(myDoc);
+                        
+                        globalPointQueries.incrementAndGet();
+                    }
+                    
+                    for (int i=1; i <= oltpSimpleRanges; i++) {
+                        //for i=1, oltp_simple_ranges do
+                        //   range_start = sb_rand(1, oltp_table_size)
+                        //   rs = db_query("SELECT c FROM ".. table_name .." WHERE id BETWEEN " .. range_start .. " AND " .. range_start .. "+" .. oltp_range_size - 1)
+                        //end
+                       
+                        //db.sbtest8.find({_id: {$gte: 5523412, $lte: 5523512}}, {c: 1, _id: 0})
+                       
+                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int endId = startId + oltpRangeSize - 1;
+                       
+                        BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
+                        BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
+                        DBCursor cursor = coll.find(query, columns);
+                        try {
+                            while(cursor.hasNext()) {
+                                cursor.next();
+                                //System.out.println(cursor.next());
+                            }
+                        } finally {
+                            cursor.close();
+                        }
+                        
+                        globalRangeQueries.incrementAndGet();
+                    }
+    
+                    for (int i=1; i <= oltpSumRanges; i++) {
+                        //for i=1, oltp_sum_ranges do
+                        //   range_start = sb_rand(1, oltp_table_size)
+                        //   rs = db_query("SELECT SUM(K) FROM ".. table_name .." WHERE id BETWEEN " .. range_start .. " AND " .. range_start .. "+" .. oltp_range_size - 1)
+                        //end
+                       
+                        //db.sbtest8.aggregate([ {$match: {_id: {$gt: 5523412, $lt: 5523512}}}, { $group: { _id: null, total: { $sum: "$k"}} } ])   
+    
+                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int endId = startId + oltpRangeSize - 1;
+    
+                        // create our pipeline operations, first with the $match
+                        DBObject match = new BasicDBObject("$match", new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId)));
+                        
+                        // build the $projection operation
+                        DBObject fields = new BasicDBObject("k", 1);
+                        fields.put("_id", 0);
+                        DBObject project = new BasicDBObject("$project", fields );
+                        
+                        // Now the $group operation
+                        DBObject groupFields = new BasicDBObject( "_id", null);
+                        groupFields.put("average", new BasicDBObject( "$sum", "$k"));
+                        DBObject group = new BasicDBObject("$group", groupFields);
+                        
+                        // run aggregation
+                        AggregationOutput output = coll.aggregate( match, project, group );
+                        
+                        //System.out.println(output.getCommandResult());
+    
+                        globalRangeQueries.incrementAndGet();
+                    }
+                   
+                    for (int i=1; i <= oltpOrderRanges; i++) {
+                        //for i=1, oltp_order_ranges do
+                        //   range_start = sb_rand(1, oltp_table_size)
+                        //   rs = db_query("SELECT c FROM ".. table_name .." WHERE id BETWEEN " .. range_start .. " AND " .. range_start .. "+" .. oltp_range_size - 1 .. " ORDER BY c")
+                        //end
+                    
+                        //db.sbtest8.find({_id: {$gte: 5523412, $lte: 5523512}}, {c: 1, _id: 0}).sort({c: 1})
+                        
+                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int endId = startId + oltpRangeSize - 1;
+                       
+                        BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
+                        BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
+                        DBCursor cursor = coll.find(query, columns).sort(new BasicDBObject("c",1));
+                        try {
+                            while(cursor.hasNext()) {
+                                cursor.next();
+                                //System.out.println(cursor.next());
+                            }
+                        } finally {
+                            cursor.close();
+                        }
+                        
+                        globalRangeQueries.incrementAndGet();
+                    }
+                
+                    for (int i=1; i <= oltpDistinctRanges; i++) {
+                        //for i=1, oltp_distinct_ranges do
+                        //   range_start = sb_rand(1, oltp_table_size)
+                        //   rs = db_query("SELECT DISTINCT c FROM ".. table_name .." WHERE id BETWEEN " .. range_start .. " AND " .. range_start .. "+" .. oltp_range_size - 1 .. " ORDER BY c")
+                        //end
+                       
+                        //db.sbtest8.distinct("c",{_id: {$gt: 5523412, $lt: 5523512}}).sort()
+                        
+                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int endId = startId + oltpRangeSize - 1;
+                       
+                        BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
+                        BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
+                        List lstDistinct = coll.distinct("c", query);
+                        //System.out.println(lstDistinct.toString());
+                        
+                        globalRangeQueries.incrementAndGet();
+                    }
+                    
+                
+                    if (readOnly.toLowerCase().equals("n")) {
+                        for (int i=1; i <= oltpIndexUpdates; i++) {
+                            //for i=1, oltp_index_updates do
+                            //   rs = db_query("UPDATE " .. table_name .. " SET k=k+1 WHERE id=" .. sb_rand(1, oltp_table_size))
+                            //end
+    
+                            //db.sbtest8.update({_id: 5523412}, {$inc: {k: 1}}, false, false)
+                            
+                            int startId = rand.nextInt(numMaxInserts)+1;
+                            
+                            WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$inc", new BasicDBObject("k",1)), false, false);
+    
+                            //System.out.println(wrUpdate.toString());
+                        }
+    
+                        for (int i=1; i <= oltpNonIndexUpdates; i++) {
+                            //for i=1, oltp_non_index_updates do
+                            //   c_val = sb_rand_str("###########-###########-###########-###########-###########-###########-###########-###########-###########-###########")
+                            //   query = "UPDATE " .. table_name .. " SET c='" .. c_val .. "' WHERE id=" .. sb_rand(1, oltp_table_size)
+                            //   rs = db_query(query)
+                            //   if rs then
+                            //     print(query)
+                            //   end
+                            //end
+    
+                            //db.sbtest8.update({_id: 5523412}, {$set: {c: "hello there"}}, false, false)
+                            
+                            int startId = rand.nextInt(numMaxInserts)+1;
+    
+                            String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
+    
+                            WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$set", new BasicDBObject("c",cVal)), false, false);
+                            
+                            //System.out.println(wrUpdate.toString());
+                        }
+                        
+                        
+                        //i = sb_rand(1, oltp_table_size)
+                        //rs = db_query("DELETE FROM " .. table_name .. " WHERE id=" .. i)
+                      
+                        //db.sbtest8.remove({_id: 5523412})
                         
                         int startId = rand.nextInt(numMaxInserts)+1;
                         
-                        WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$inc", new BasicDBObject("k",1)), false, false);
-
-                        //System.out.println(wrUpdate.toString());
-                    }
-
-                    for (int i=1; i <= oltpNonIndexUpdates; i++) {
-                        //for i=1, oltp_non_index_updates do
-                        //   c_val = sb_rand_str("###########-###########-###########-###########-###########-###########-###########-###########-###########-###########")
-                        //   query = "UPDATE " .. table_name .. " SET c='" .. c_val .. "' WHERE id=" .. sb_rand(1, oltp_table_size)
-                        //   rs = db_query(query)
-                        //   if rs then
-                        //     print(query)
-                        //   end
-                        //end
-
-                        //db.sbtest8.update({_id: 5523412}, {$set: {c: "hello there"}}, false, false)
-                        
-                        int startId = rand.nextInt(numMaxInserts)+1;
-
+                        WriteResult wrRemove = coll.remove(new BasicDBObject("_id", startId));
+    
+    
+                        //c_val = sb_rand_str([[###########-###########-###########-###########-###########-###########-###########-###########-###########-###########]])
+                        //pad_val = sb_rand_str([[###########-###########-###########-###########-###########]])
+                        //rs = db_query("INSERT INTO " .. table_name ..  " (id, k, c, pad) VALUES " .. string.format("(%d, %d, '%s', '%s')",i, sb_rand(1, oltp_table_size) , c_val, pad_val))
+                
+                        BasicDBObject doc = new BasicDBObject();
+                        doc.put("_id",startId);
+                        doc.put("k",rand.nextInt(numMaxInserts)+1);
                         String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
-
-                        WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$set", new BasicDBObject("c",cVal)), false, false);
-                        
-                        //System.out.println(wrUpdate.toString());
+                        doc.put("c",cVal);
+                        String padVal = sysbenchString(rand, "###########-###########-###########-###########-###########");
+                        doc.put("pad",padVal);
+                        WriteResult wrInsert = coll.insert(doc);
                     }
-                    
-                    
-                    //i = sb_rand(1, oltp_table_size)
-                    //rs = db_query("DELETE FROM " .. table_name .. " WHERE id=" .. i)
-                  
-                    //db.sbtest8.remove({_id: 5523412})
-                    
-                    int startId = rand.nextInt(numMaxInserts)+1;
-                    
-                    WriteResult wrRemove = coll.remove(new BasicDBObject("_id", startId));
-
-
-                    //c_val = sb_rand_str([[###########-###########-###########-###########-###########-###########-###########-###########-###########-###########]])
-                    //pad_val = sb_rand_str([[###########-###########-###########-###########-###########]])
-                    //rs = db_query("INSERT INTO " .. table_name ..  " (id, k, c, pad) VALUES " .. string.format("(%d, %d, '%s', '%s')",i, sb_rand(1, oltp_table_size) , c_val, pad_val))
-            
-                    BasicDBObject doc = new BasicDBObject();
-                    doc.put("_id",startId);
-                    doc.put("k",rand.nextInt(numMaxInserts)+1);
-                    String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
-                    doc.put("c",cVal);
-                    String padVal = sysbenchString(rand, "###########-###########-###########-###########-###########");
-                    doc.put("pad",padVal);
-                    WriteResult wrInsert = coll.insert(doc);
+                
+                    globalSysbenchTransactions.incrementAndGet();
+                    numTransactions += 1;
+               
+                } finally {
+                    if (bIsTokuMX) {
+                        // commit the transaction and release current connection in the pool
+                        db.command("commitTransaction");
+                        //--db.command("rollbackTransaction")
+                        db.requestDone();
+                    }
                 }
-            
-               globalSysbenchTransactions.incrementAndGet();
             }
 
             //} catch (Exception e) {

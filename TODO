@@ -1,5 +1,4 @@
 - add insert governer for loader
-- add tps governer for benchmark
 - improve command line argument passing
   - use "--argument value" syntax
   - add defaults

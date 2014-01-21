@@ -16,7 +16,8 @@
         <sequential>
             <java classname="@{classname}" fork="yes" failonerror="true">
                 <jvmarg value="-server"/>
-                <jvmarg value="-Xmx512m"/>
+                <jvmarg value="-Xmx1024m"/>
+                <jvmarg value="-Xms1024m"/>
                 <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
                 <jvmarg value="-XX:HeapDumpPath=/tmp"/>
                 <jvmarg value="-XX:-ReduceInitialCardMarks"/>
@@ -45,7 +46,6 @@
     </target>
     
     <target name="load" description="Run loader.">
-        <fail unless="env.MONGO_TYPE" message="MONGO_TYPE not set."/>
         <fail unless="env.DB_NAME" message="DB_NAME not set."/>
         <fail unless="env.MONGO_COMPRESSION" message="MONGO_COMPRESSION not set."/>
         <fail unless="env.MONGO_BASEMENT" message="MONGO_BASEMENT not set."/>
@@ -56,6 +56,9 @@
         <fail unless="env.NUM_INSERTS_PER_FEEDBACK" message="NUM_INSERTS_PER_FEEDBACK not set."/>
         <fail unless="env.NUM_SECONDS_PER_FEEDBACK" message="NUM_SECONDS_PER_FEEDBACK not set."/>
         <fail unless="env.BENCHMARK_TSV" message="BENCHMARK_TSV not set."/>
+        <fail unless="env.WRITE_CONCERN" message="WRITE_CONCERN not set."/>
+        <fail unless="env.MONGO_SERVER" message="MONGO_SERVER not set."/>
+        <fail unless="env.MONGO_PORT" message="MONGO_PORT not set."/>
         
         <invoke-java classname="jmongosysbenchload">
             <arg value="${env.NUM_COLLECTIONS}"/>                <!-- number of collections -->
@@ -66,9 +69,11 @@
             <arg value="${env.NUM_INSERTS_PER_FEEDBACK}"/>       <!-- number of inserts between feedback/progress messages  -->
             <arg value="${env.NUM_SECONDS_PER_FEEDBACK}"/>       <!-- number of seconds between feedback/progress messages  -->
             <arg value="${env.BENCHMARK_TSV}"/>                  <!-- name of log file -->
-            <arg value="${env.MONGO_TYPE}"/>                     <!-- technology : mongo/tokumon -->
-            <arg value="${env.MONGO_COMPRESSION}"/>              <!-- compression type (if tokumon), valid values are lzma, quicklz, zlib, none -->
-            <arg value="${env.MONGO_BASEMENT}"/>                 <!-- basement node size (if tokumon), 131072 = 128K -->
+            <arg value="${env.MONGO_COMPRESSION}"/>              <!-- compression type (if tokumx), valid values are lzma, quicklz, zlib, none -->
+            <arg value="${env.MONGO_BASEMENT}"/>                 <!-- basement node size (if tokumx), 131072 = 128K -->
+            <arg value="${env.WRITE_CONCERN}"/>                  <!-- write concern (FSYNC_SAFE, NONE, NORMAL, REPLICAS_SAFE, SAFE) -->
+            <arg value="${env.MONGO_SERVER}"/>                   <!-- MongoDB/TokuMX server IP, name, or localhost -->
+            <arg value="${env.MONGO_PORT}"/>                     <!-- MongoDB/TokuMX server client port -->
         </invoke-java>
     </target>
 
@@ -79,7 +84,6 @@
         <fail unless="env.NUM_DOCUMENTS_PER_COLLECTION" message="NUM_DOCUMENTS_PER_COLLECTION not set."/>
         <fail unless="env.NUM_SECONDS_PER_FEEDBACK" message="NUM_SECONDS_PER_FEEDBACK not set."/>
         <fail unless="env.BENCHMARK_TSV" message="BENCHMARK_TSV not set."/>
-        <fail unless="env.MONGO_TYPE" message="MONGO_TYPE not set."/>
         <fail unless="env.SYSBENCH_READ_ONLY" message="SYSBENCH_READ_ONLY not set."/>
         <fail unless="env.RUN_TIME_SECONDS" message="RUN_TIME_SECONDS not set."/>
         <fail unless="env.SYSBENCH_RANGE_SIZE" message="SYSBENCH_RANGE_SIZE not set."/>
@@ -90,6 +94,10 @@
         <fail unless="env.SYSBENCH_DISTINCT_RANGES" message="SYSBENCH_DISTINCT_RANGES not set."/>
         <fail unless="env.SYSBENCH_INDEX_UPDATES" message="SYSBENCH_INDEX_UPDATES not set."/>
         <fail unless="env.SYSBENCH_NON_INDEX_UPDATES" message="SYSBENCH_NON_INDEX_UPDATES not set."/>
+        <fail unless="env.WRITE_CONCERN" message="WRITE_CONCERN not set."/>
+        <fail unless="env.MAX_TPS" message="MAX_TPS not set."/>
+        <fail unless="env.MONGO_SERVER" message="MONGO_SERVER not set."/>
+        <fail unless="env.MONGO_PORT" message="MONGO_PORT not set."/>
         
         <invoke-java classname="jmongosysbenchexecute">
             <arg value="${env.NUM_COLLECTIONS}"/>                <!-- number of collections -->
@@ -98,7 +106,6 @@
             <arg value="${env.NUM_DOCUMENTS_PER_COLLECTION}"/>   <!-- documents to insert per collection -->
             <arg value="${env.NUM_SECONDS_PER_FEEDBACK}"/>       <!-- number of seconds between feedback/progress messages  -->
             <arg value="${env.BENCHMARK_TSV}"/>                  <!-- name of log file -->
-            <arg value="${env.MONGO_TYPE}"/>                     <!-- technology : mongo/tokumon -->
             <arg value="${env.SYSBENCH_READ_ONLY}"/>             <!-- read only benchmark : Y/N -->
             <arg value="${env.RUN_TIME_SECONDS}"/>               <!-- number of seconds to run for -->
             <arg value="${env.SYSBENCH_RANGE_SIZE}"/>            <!-- number of documents to retrieve for range queries -->
@@ -109,6 +116,42 @@
             <arg value="${env.SYSBENCH_DISTINCT_RANGES}"/>       <!-- number of DISTINCT ranges queries per sysbench transaction -->
             <arg value="${env.SYSBENCH_INDEX_UPDATES}"/>         <!-- number of indexed updates per sysbench transaction -->
             <arg value="${env.SYSBENCH_NON_INDEX_UPDATES}"/>     <!-- number of non-indexed updates per sysbench transaction -->
+            <arg value="${env.WRITE_CONCERN}"/>                  <!-- write concern (FSYNC_SAFE, NONE, NORMAL, REPLICAS_SAFE, SAFE) -->
+            <arg value="${env.MAX_TPS}"/>                        <!-- maximum total transactions per second (we will do our best to respect this) -->
+            <arg value="${env.MONGO_SERVER}"/>                   <!-- MongoDB/TokuMX server IP, name, or localhost -->
+            <arg value="${env.MONGO_PORT}"/>                     <!-- MongoDB/TokuMX server client port -->
+        </invoke-java>
+    </target>
+
+    <target name="pileup" description="Run pileup (primary/secondary point/range) benchmark.">
+        <fail unless="env.NUM_COLLECTIONS" message="NUM_COLLECTIONS not set."/>
+        <fail unless="env.DB_NAME" message="DB_NAME not set."/>
+        <fail unless="env.NUM_READER_THREADS" message="NUM_READER_THREADS not set."/>
+        <fail unless="env.NUM_DOCUMENTS_PER_COLLECTION" message="NUM_DOCUMENTS_PER_COLLECTION not set."/>
+        <fail unless="env.NUM_SECONDS_PER_FEEDBACK" message="NUM_SECONDS_PER_FEEDBACK not set."/>
+        <fail unless="env.BENCHMARK_TSV" message="BENCHMARK_TSV not set."/>
+        <fail unless="env.PILEUP_BENCHMARK_TYPE" message="PILEUP_BENCHMARK_TYPE not set."/>
+        <fail unless="env.RUN_TIME_SECONDS" message="RUN_TIME_SECONDS not set."/>
+        <fail unless="env.SYSBENCH_POINT_SELECTS" message="SYSBENCH_POINT_SELECTS not set."/>
+        <fail unless="env.SYSBENCH_RANGE_SIZE" message="SYSBENCH_RANGE_SIZE not set."/>
+        <fail unless="env.SYSBENCH_RANGE_LIMIT" message="SYSBENCH_RANGE_LIMIT not set."/>
+        <fail unless="env.WRITE_CONCERN" message="WRITE_CONCERN not set."/>
+        <fail unless="env.MAX_TPS" message="MAX_TPS not set."/>
+        
+        <invoke-java classname="jmongosysbenchpileup">
+            <arg value="${env.NUM_COLLECTIONS}"/>                <!-- number of collections -->
+            <arg value="${env.DB_NAME}"/>                        <!-- database name -->
+            <arg value="${env.NUM_READER_THREADS}"/>             <!-- number of reader threads -->
+            <arg value="${env.NUM_DOCUMENTS_PER_COLLECTION}"/>   <!-- documents to insert per collection -->
+            <arg value="${env.NUM_SECONDS_PER_FEEDBACK}"/>       <!-- number of seconds between feedback/progress messages  -->
+            <arg value="${env.BENCHMARK_TSV}"/>                  <!-- name of log file -->
+            <arg value="${env.PILEUP_BENCHMARK_TYPE}"/>          <!-- PP = primary point, SP = secondary point, PR = primary range, SR = secondary range -->
+            <arg value="${env.RUN_TIME_SECONDS}"/>               <!-- number of seconds to run for -->
+            <arg value="${env.SYSBENCH_POINT_SELECTS}"/>         <!-- number of point selects per sysbench transaction -->
+            <arg value="${env.SYSBENCH_RANGE_SIZE}"/>            <!-- range scan [potential] size -->
+            <arg value="${env.SYSBENCH_RANGE_LIMIT}"/>           <!-- range scan limit -->
+            <arg value="${env.WRITE_CONCERN}"/>                  <!-- write concern (FSYNC_SAFE, NONE, NORMAL, REPLICAS_SAFE, SAFE) -->
+            <arg value="${env.MAX_TPS}"/>                        <!-- maximum total transactions per second (we will do our best to respect this) -->
         </invoke-java>
     </target>
     
