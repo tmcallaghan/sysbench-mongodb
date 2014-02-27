@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Properties;
 import java.util.List;
+import java.util.Random;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.File;
@@ -42,6 +43,7 @@ public class jmongosysbenchexecute {
 
     public static int numCollections;
     public static String dbName;
+    public static String padding;
     public static int writerThreads;
     public static Integer numMaxInserts;
     public static long secondsPerFeedback;
@@ -72,11 +74,11 @@ public class jmongosysbenchexecute {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 20) {
+        if (args.length != 22) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
                                    "[log file name] [read only Y/N] [runtime (seconds)] [range size] [point selects] "+
-                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [writeconcern] [max tps] [server] [port]");
+                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [writeconcern] [max tps] [server] [port] [padding] [compressibility]");
             System.exit(1);
         }
         
@@ -100,6 +102,9 @@ public class jmongosysbenchexecute {
         maxTPS = Integer.valueOf(args[17]);
         serverName = args[18];
         serverPort = Integer.valueOf(args[19]);
+        int padSize = Integer.valueOf(args[20]);
+        double compressibility = Double.valueOf(args[21]);
+        padding = Utils.generateRandomString(padSize, compressibility);
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
         
@@ -131,6 +136,7 @@ public class jmongosysbenchexecute {
         logMe("  database name            = %s",dbName);
         logMe("  writer threads           = %d",writerThreads);
         logMe("  documents per collection = %,d",numMaxInserts);
+        logMe("  padding per doc          = %,d",padding.length());
         logMe("  feedback seconds         = %,d",secondsPerFeedback);
         logMe("  log file                 = %s",logFileName);
         logMe("  read only                = %s",readOnly);
@@ -433,7 +439,7 @@ public class jmongosysbenchexecute {
                             
                             int startId = rand.nextInt(numMaxInserts)+1;
     
-                            String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
+                            String cVal = Utils.sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
     
                             WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$set", new BasicDBObject("c",cVal)), false, false);
                             
@@ -455,14 +461,8 @@ public class jmongosysbenchexecute {
                         //pad_val = sb_rand_str([[###########-###########-###########-###########-###########]])
                         //rs = db_query("INSERT INTO " .. table_name ..  " (id, k, c, pad) VALUES " .. string.format("(%d, %d, '%s', '%s')",i, sb_rand(1, oltp_table_size) , c_val, pad_val))
                 
-                        BasicDBObject doc = new BasicDBObject();
-                        doc.put("_id",startId);
-                        doc.put("k",rand.nextInt(numMaxInserts)+1);
-                        String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
-                        doc.put("c",cVal);
-                        String padVal = sysbenchString(rand, "###########-###########-###########-###########-###########");
-                        doc.put("pad",padVal);
-                        WriteResult wrInsert = coll.insert(doc);
+                        DBObject doc = Utils.buildDocument(rand, startId, numMaxInserts, padding);
+                        WriteResult wrInsert = coll.update(new BasicDBObject("_id", doc.get("_id")), doc, true, false);
                     }
                 
                     globalSysbenchTransactions.incrementAndGet();
@@ -488,22 +488,6 @@ public class jmongosysbenchexecute {
     }
     
     
-    public static String sysbenchString(java.util.Random rand, String thisMask) {
-        String returnString = "";
-        for (int i = 0, n = thisMask.length() ; i < n ; i++) { 
-            char c = thisMask.charAt(i); 
-            if (c == '#') {
-                returnString += String.valueOf(rand.nextInt(10));
-            } else if (c == '@') {
-                returnString += (char) (rand.nextInt(26) + 'a');
-            } else {
-                returnString += c;
-            }
-        }
-        return returnString;
-    }
-
-
     // reporting thread, outputs information to console and file
     class MyReporter implements Runnable {
         public void run()
