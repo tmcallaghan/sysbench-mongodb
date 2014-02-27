@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Properties;
+import java.util.Random;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.File;
@@ -46,6 +47,7 @@ public class jmongosysbenchload {
     public static String myWriteConcern;
     public static String serverName;
     public static int serverPort;
+    public static String padding;
     
     public static int allDone = 0;
     
@@ -53,9 +55,9 @@ public class jmongosysbenchload {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 13) {
+        if (args.length != 15) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [padSize] [compressibility]");
             System.exit(1);
         }
         
@@ -72,6 +74,10 @@ public class jmongosysbenchload {
         myWriteConcern = args[10];
         serverName = args[11];
         serverPort = Integer.valueOf(args[12]);
+        int padSize = Integer.valueOf(args[13]);
+        double compressibility = Double.valueOf(args[14]);
+        padding = Utils.generateRandomString(padSize, compressibility);
+        
         
         WriteConcern myWC = new WriteConcern();
         if (myWriteConcern.toLowerCase().equals("fsync_safe")) {
@@ -101,6 +107,7 @@ public class jmongosysbenchload {
         logMe("  database name = %s",dbName);
         logMe("  %d writer thread(s)",writerThreads);
         logMe("  %,d documents per collection",numMaxInserts);
+        logMe("  padding per doc = %,d",padding.length());
         logMe("  Documents Per Insert = %d",documentsPerInsert);
         logMe("  Feedback every %,d seconds(s)",secondsPerFeedback);
         logMe("  Feedback every %,d inserts(s)",insertsPerFeedback);
@@ -264,7 +271,7 @@ public class jmongosysbenchload {
                 System.exit(1);
             }
 
-logMe("Writer thread %d : creating collection %s",threadNumber, collectionName);
+            logMe("Writer thread %d : creating collection %s",threadNumber, collectionName);
 
             DBCollection coll = db.getCollection(collectionName);
         
@@ -276,7 +283,7 @@ logMe("Writer thread %d : creating collection %s",threadNumber, collectionName);
                 idxOptions.put("readPageSize",basementSize);
             }
 
-logMe("Writer thread %d : creating collection %s secondary index",threadNumber, collectionName);
+            logMe("Writer thread %d : creating collection %s secondary index",threadNumber, collectionName);
 
             coll.ensureIndex(new BasicDBObject("k", 1), idxOptions);
             
@@ -293,13 +300,7 @@ logMe("Writer thread %d : creating collection %s secondary index",threadNumber, 
                 for (int roundNum = 0; roundNum < numRounds; roundNum++) {
                     for (int i = 0; i < documentsPerInsert; i++) {
                         id++;
-                        BasicDBObject doc = new BasicDBObject();
-                        doc.put("_id",id);
-                        doc.put("k",rand.nextInt(numMaxInserts)+1);
-                        String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
-                        doc.put("c",cVal);
-                        String padVal = sysbenchString(rand, "###########-###########-###########-###########-###########");
-                        doc.put("pad",padVal);
+                        BasicDBObject doc = Utils.buildDocument(rand, id, numMaxInserts, padding);
                         aDocs[i]=doc;
                     }
 
@@ -318,22 +319,6 @@ logMe("Writer thread %d : creating collection %s secondary index",threadNumber, 
     }
     
     
-    public static String sysbenchString(java.util.Random rand, String thisMask) {
-        String returnString = "";
-        for (int i = 0, n = thisMask.length() ; i < n ; i++) { 
-            char c = thisMask.charAt(i); 
-            if (c == '#') {
-                returnString += String.valueOf(rand.nextInt(10));
-            } else if (c == '@') {
-                returnString += (char) (rand.nextInt(26) + 'a');
-            } else {
-                returnString += c;
-            }
-        }
-        return returnString;
-    }
-
-
     // reporting thread, outputs information to console and file
     class MyReporter implements Runnable {
         public void run()
