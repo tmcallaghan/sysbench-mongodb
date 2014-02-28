@@ -119,7 +119,7 @@ printf "`date` | sysbench loader duration = %02d:%02d:%02d:%02d\n" "$((T/86400))
 
 # execute the benchmark
 
-export LOG_NAME=mongoSysbenchExecute-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_WRITER_THREADS}
+export LOG_NAME=mongoSysbenchExecute-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_WRITER_THREADS}.txt
 export BENCHMARK_TSV=${LOG_NAME}.tsv
     
 rm -f $LOG_NAME
