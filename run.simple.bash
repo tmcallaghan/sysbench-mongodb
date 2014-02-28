@@ -104,7 +104,7 @@ javac -cp $CLASSPATH:$PWD/src src/jmongosysbenchexecute.java
 
 # load the data
 
-export LOG_NAME=mongoSysbenchLoad-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_LOADER_THREADS}
+export LOG_NAME=mongoSysbenchLoad-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_LOADER_THREADS}.txt
 export BENCHMARK_TSV=${LOG_NAME}.tsv
     
 rm -f $LOG_NAME
