@@ -1,23 +1,27 @@
 sysbench-mongodb
 ================
 
-Sysbench for MongoDB
+Sysbench for MongoDB and TokuMX
+
+
+Requirements
+=====================
+
+* Java 1.6 or 1.7
+* The MongoDB Java driver must exist and be in the CLASSPATH, as in "export CLASSPATH=/home/tcallaghan/java_goodies/mongo-2.11.4.jar:.". If you don't already have the MongoDB Java driver, then execute the following two commands:
+** wget http://central.maven.org/maven2/org/mongodb/mongo-java-driver/2.11.4/mongo-java-driver-2.11.4.jar
+** export CLASSPATH=$PWD/mongo-java-driver-2.11.4.jar:$CLASSPATH
+* This example assumes that you already have a MongoDB or TokuMX server running on the same machine as the sysbench client application.
+* You can connect a different server or port by editing the run.simple.bash script. 
 
 
 Running the benchmark
 =====================
 
-This example assumes that you already have a MongoDB or TokuMX server running on the same machine as the sysbench client application.  You can connect a different server or port by editing the run.simple.bash script.
+**In the default configuration the benchmark creates 16 collections, each with 10 million documents.**
 
-In it's default configuration it creates 16 collections, each with 10 million documents.
-
-Note, you need to have the MongoDB Java driver in your CLASSPATH, as in "export CLASSPATH=/home/tcallaghan/java_goodies/mongo-2.11.2.jar:.".
-
-tcallaghan@tmcdsk:~/temp/test$ git clone https://github.com/tmcallaghan/sysbench-mongodb.git
-
-tcallaghan@tmcdsk:~/temp/test$ cd sysbench-mongodb
-
-[optionally edit run.simple.bash to modify the benchmark behavior]
-
-tcallaghan@tmcdsk:~/temp/test/sysbench-mongodb$ ./run.simple.bash
+* git clone https://github.com/tmcallaghan/sysbench-mongodb.git
+* cd sysbench-mongodb
+* *[optionally edit run.simple.bash to modify the benchmark behavior]*
+* ./run.simple.bash
 
