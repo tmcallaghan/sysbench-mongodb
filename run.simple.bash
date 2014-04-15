@@ -1,6 +1,17 @@
 #!/bin/bash
 
 # simple script to run against running MongoDB/TokuMX server localhost:(default port)
+# takes 3 args: DOLOAD DOQUERY SEED
+
+# Use "yes" to load the database
+DOLOAD=$1
+
+# Use "yes" to query the database
+DOQUERY=$2
+
+# Use a seed for the RNG, like $( date +%s )
+# This can be used to repeat, or not, the sequence of keys used per test.
+SEED=$3
 
 # if running TokuMX, need to select compression for collection and secondary indexes (zlib is default)
 #   valid values : lzma, quicklz, zlib, none
@@ -61,9 +72,9 @@ export MONGO_SERVER=localhost
 # port of the server to connect to
 export MONGO_PORT=27017
 
-# set to Y to run in "read only" mode, just queries
+# set to N to use begin/commit/ensure for TokuMX
 #   valid values : N or Y
-export SYSBENCH_READ_ONLY=N
+export SYSBENCH_AUTO_COMMIT=Y
 
 # number of documents to retrieve in range queries
 #   valud values : integer > 0
@@ -97,6 +108,8 @@ export SYSBENCH_INDEX_UPDATES=1
 #   valud values : integer > 0
 export SYSBENCH_NON_INDEX_UPDATES=1
 
+# number of inserts per transaction
+export SYSBENCH_INSERTS=0
 
 javac -cp $CLASSPATH:$PWD/src src/jmongosysbenchload.java
 javac -cp $CLASSPATH:$PWD/src src/jmongosysbenchexecute.java
@@ -104,6 +117,8 @@ javac -cp $CLASSPATH:$PWD/src src/jmongosysbenchexecute.java
 
 # load the data
 
+if [[ $DOLOAD = "yes" ]]; then
+echo Do load at $( date )
 export LOG_NAME=mongoSysbenchLoad-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_LOADER_THREADS}.txt
 export BENCHMARK_TSV=${LOG_NAME}.tsv
     
@@ -115,10 +130,12 @@ java -cp $CLASSPATH:$PWD/src jmongosysbenchload $NUM_COLLECTIONS $DB_NAME $NUM_L
 echo "" | tee -a $LOG_NAME
 T="$(($(date +%s)-T))"
 printf "`date` | sysbench loader duration = %02d:%02d:%02d:%02d\n" "$((T/86400))" "$((T/3600%24))" "$((T/60%60))" "$((T%60))" | tee -a $LOG_NAME
-
+fi
 
 # execute the benchmark
 
+if [[ $DOQUERY = "yes" ]]; then
+echo Do query at $( date )
 export LOG_NAME=mongoSysbenchExecute-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_WRITER_THREADS}.txt
 export BENCHMARK_TSV=${LOG_NAME}.tsv
     
@@ -126,7 +143,9 @@ rm -f $LOG_NAME
 rm -f $BENCHMARK_TSV
 
 T="$(date +%s)"
-java -cp $CLASSPATH:$PWD/src jmongosysbenchexecute $NUM_COLLECTIONS $DB_NAME $NUM_WRITER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV $SYSBENCH_READ_ONLY $RUN_TIME_SECONDS $SYSBENCH_RANGE_SIZE $SYSBENCH_POINT_SELECTS $SYSBENCH_SIMPLE_RANGES $SYSBENCH_SUM_RANGES $SYSBENCH_ORDER_RANGES $SYSBENCH_DISTINCT_RANGES $SYSBENCH_INDEX_UPDATES $SYSBENCH_NON_INDEX_UPDATES $WRITE_CONCERN $MAX_TPS $MONGO_SERVER $MONGO_PORT | tee -a $LOG_NAME
+java -cp $CLASSPATH:$PWD/src jmongosysbenchexecute $NUM_COLLECTIONS $DB_NAME $NUM_WRITER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV $SYSBENCH_AUTO_COMMIT $RUN_TIME_SECONDS $SYSBENCH_RANGE_SIZE $SYSBENCH_POINT_SELECTS $SYSBENCH_SIMPLE_RANGES $SYSBENCH_SUM_RANGES $SYSBENCH_ORDER_RANGES $SYSBENCH_DISTINCT_RANGES $SYSBENCH_INDEX_UPDATES $SYSBENCH_NON_INDEX_UPDATES $SYSBENCH_INSERTS $WRITE_CONCERN $MAX_TPS $MONGO_SERVER $MONGO_PORT $SEED | tee -a $LOG_NAME
 echo "" | tee -a $LOG_NAME
 T="$(($(date +%s)-T))"
 printf "`date` | sysbench benchmark duration = %02d:%02d:%02d:%02d\n" "$((T/86400))" "$((T/3600%24))" "$((T/60%60))" "$((T%60))" | tee -a $LOG_NAME
+fi
+
