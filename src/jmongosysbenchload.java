@@ -28,7 +28,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class jmongosysbenchload {
     public static AtomicLong globalInserts = new AtomicLong(0);
     public static AtomicLong globalWriterThreads = new AtomicLong(0);
-    
+
     public static Writer writer = null;
     public static boolean outputHeader = true;
 
@@ -46,9 +46,9 @@ public class jmongosysbenchload {
     public static String myWriteConcern;
     public static String serverName;
     public static int serverPort;
-    
+
     public static int allDone = 0;
-    
+
     public jmongosysbenchload() {
     }
 
@@ -58,7 +58,7 @@ public class jmongosysbenchload {
             logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port]");
             System.exit(1);
         }
-        
+
         numCollections = Integer.valueOf(args[0]);
         dbName = args[1];
         writerThreads = Integer.valueOf(args[2]);
@@ -72,7 +72,7 @@ public class jmongosysbenchload {
         myWriteConcern = args[10];
         serverName = args[11];
         serverPort = Integer.valueOf(args[12]);
-        
+
         WriteConcern myWC = new WriteConcern();
         if (myWriteConcern.toLowerCase().equals("fsync_safe")) {
             myWC = WriteConcern.FSYNC_SAFE;
@@ -88,13 +88,13 @@ public class jmongosysbenchload {
         }
         else if ((myWriteConcern.toLowerCase().equals("safe"))) {
             myWC = WriteConcern.SAFE;
-        } 
+        }
         else {
             logMe("*** ERROR : WRITE CONCERN ISSUE ***");
             logMe("  write concern %s is not supported",myWriteConcern);
             System.exit(1);
         }
-        
+
         logMe("Application Parameters");
         logMe("--------------------------------------------------");
         logMe("  %d collections",numCollections);
@@ -110,7 +110,8 @@ public class jmongosysbenchload {
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-        MongoClient m = new MongoClient(srvrAdd, clientOptions);
+        MongoCredential credential = MongoCredential.createMongoCRCredential('dba', dbName, 'dba');
+        MongoClient m = new MongoClient(srvrAdd, clientOptions, Arrays.asList(credential));
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
         logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
@@ -150,14 +151,14 @@ public class jmongosysbenchload {
             logMe(" *** Unknown Indexing Technology %s, shutting down",indexTechnology);
             System.exit(1);
         }
-        
+
         jmongosysbenchload t = new jmongosysbenchload();
 
         Thread reporterThread = new Thread(t.new MyReporter());
         reporterThread.start();
 
         Thread[] tWriterThreads = new Thread[writerThreads];
-        
+
         for (int collectionNumber = 0; collectionNumber < numCollections; collectionNumber++) {
             // if necessary, wait for an available slot for this loader
             boolean waitingForSlot = true;
@@ -204,13 +205,13 @@ public class jmongosysbenchload {
         //    if (tWriterThreads[i].isAlive())
         //        tWriterThreads[i].join();
         //}
-        
+
         // all the writers are finished
         allDone = 1;
-        
+
         if (reporterThread.isAlive())
             reporterThread.join();
-        
+
         try {
             if (writer != null) {
                 writer.close();
@@ -218,24 +219,24 @@ public class jmongosysbenchload {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
+
         // m.dropDatabase("mydb");
 
         m.close();
-        
+
         logMe("Done!");
     }
-    
+
     class MyWriter implements Runnable {
         int collectionNumber;
-        int threadCount; 
-        int threadNumber; 
+        int threadCount;
+        int threadNumber;
         int numTables;
         int numMaxInserts;
         DB db;
-        
+
         java.util.Random rand;
-        
+
         MyWriter(int collectionNumber, int threadCount, int threadNumber, int numMaxInserts, DB db) {
             this.collectionNumber = collectionNumber;
             this.threadCount = threadCount;
@@ -246,7 +247,7 @@ public class jmongosysbenchload {
         }
         public void run() {
             String collectionName = "sbtest" + Integer.toString(collectionNumber);
-            
+
             if (indexTechnology.toLowerCase().equals("tokumx")) {
                 DBObject cmd = new BasicDBObject();
                 cmd.put("create", collectionName);
@@ -257,7 +258,7 @@ public class jmongosysbenchload {
                 //logMe(result.toString());
             } else if (indexTechnology.toLowerCase().equals("mongo")) {
                 // nothing special to do for a regular mongo collection
-                
+
             } else {
                 // unknown index technology, abort
                 logMe(" *** Unknown Indexing Technology %s, shutting down",indexTechnology);
@@ -267,10 +268,10 @@ public class jmongosysbenchload {
 logMe("Writer thread %d : creating collection %s",threadNumber, collectionName);
 
             DBCollection coll = db.getCollection(collectionName);
-        
+
             BasicDBObject idxOptions = new BasicDBObject();
             idxOptions.put("background",false);
-        
+
             if (indexTechnology.toLowerCase().equals("tokumx")) {
                 idxOptions.put("compression",compressionType);
                 idxOptions.put("readPageSize",basementSize);
@@ -279,7 +280,7 @@ logMe("Writer thread %d : creating collection %s",threadNumber, collectionName);
 logMe("Writer thread %d : creating collection %s secondary index",threadNumber, collectionName);
 
             coll.ensureIndex(new BasicDBObject("k", 1), idxOptions);
-            
+
             long numInserts = 0;
             int id = 0;
 
@@ -287,9 +288,9 @@ logMe("Writer thread %d : creating collection %s secondary index",threadNumber, 
                 logMe("Writer thread %d : started to load collection %s",threadNumber, collectionName);
 
                 BasicDBObject[] aDocs = new BasicDBObject[documentsPerInsert];
-                
+
                 int numRounds = numMaxInserts / documentsPerInsert;
-                
+
                 for (int roundNum = 0; roundNum < numRounds; roundNum++) {
                     for (int i = 0; i < documentsPerInsert; i++) {
                         id++;
@@ -312,16 +313,16 @@ logMe("Writer thread %d : creating collection %s secondary index",threadNumber, 
                 logMe("Writer thread %d : EXCEPTION",threadNumber);
                 e.printStackTrace();
             }
-            
+
             globalWriterThreads.decrementAndGet();
         }
     }
-    
-    
+
+
     public static String sysbenchString(java.util.Random rand, String thisMask) {
         String returnString = "";
-        for (int i = 0, n = thisMask.length() ; i < n ; i++) { 
-            char c = thisMask.charAt(i); 
+        for (int i = 0, n = thisMask.length() ; i < n ; i++) {
+            char c = thisMask.charAt(i);
             if (c == '#') {
                 returnString += String.valueOf(rand.nextInt(10));
             } else if (c == '@') {
@@ -353,7 +354,7 @@ logMe("Writer thread %d : creating collection %s secondary index",threadNumber, 
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                
+
                 long now = System.currentTimeMillis();
                 thisInserts = globalInserts.get();
                 if (((now > nextFeedbackMillis) && (secondsPerFeedback > 0)) ||
@@ -365,27 +366,27 @@ logMe("Writer thread %d : creating collection %s secondary index",threadNumber, 
 
                     long elapsed = now - t0;
                     long thisIntervalMs = now - lastMs;
-                    
+
                     long thisIntervalInserts = thisInserts - lastInserts;
                     double thisIntervalInsertsPerSecond = thisIntervalInserts/(double)thisIntervalMs*1000.0;
                     double thisInsertsPerSecond = thisInserts/(double)elapsed*1000.0;
-                    
+
                     if (secondsPerFeedback > 0)
                     {
                         logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f", thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
                     } else {
                         logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f", intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
                     }
-                    
+
                     try {
                         if (outputHeader)
                         {
                             writer.write("tot_inserts\telap_secs\tcum_ips\tint_ips\n");
                             outputHeader = false;
                         }
-                            
+
                         String statusUpdate = "";
-                        
+
                         if (secondsPerFeedback > 0)
                         {
                             statusUpdate = String.format("%d\t%d\t%.2f\t%.2f\n",thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
@@ -403,7 +404,7 @@ logMe("Writer thread %d : creating collection %s secondary index",threadNumber, 
                     lastMs = now;
                 }
             }
-            
+
             // output final numbers...
             long now = System.currentTimeMillis();
             thisInserts = globalInserts.get();
@@ -439,7 +440,7 @@ logMe("Writer thread %d : creating collection %s secondary index",threadNumber, 
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            
+
         }
     }
 
