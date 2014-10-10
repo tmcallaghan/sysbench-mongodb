@@ -110,7 +110,7 @@ public class jmongosysbenchload {
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-        MongoCredential credential = MongoCredential.createMongoCRCredential('dba', 'admin', 'dba');
+        MongoCredential credential = MongoCredential.createMongoCRCredential("dba", "admin", "dba");
         MongoClient m = new MongoClient(srvrAdd, clientOptions, Arrays.asList(credential));
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
