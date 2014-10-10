@@ -1,7 +1,6 @@
 //import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientOptions;
-import com.mongodb.MongoCredential;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
@@ -111,8 +110,11 @@ public class jmongosysbenchload {
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-        MongoCredential credential = MongoCredential.createMongoCRCredential("dba", "admin", "dba");
-        MongoClient m = new MongoClient(srvrAdd, clientOptions, Arrays.asList(credential));
+        //MongoClient m = new MongoClient(srvrAdd, clientOptions, Arrays.asList(credential));
+        connectString = ("mongodb://dba:dba@%s/admin", serverName);
+        MongoClient mongo = new MongoClient(
+            new MongoClientURI( connectString )
+        );
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
         logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
