@@ -1,5 +1,6 @@
 //import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
+import com.mongodb.MongoCredential;
 import com.mongodb.MongoClientOptions;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -46,6 +47,8 @@ public class jmongosysbenchload {
     public static String myWriteConcern;
     public static String serverName;
     public static int serverPort;
+    public static String userName;
+    public static String passWord;
 
     public static int allDone = 0;
 
@@ -55,7 +58,7 @@ public class jmongosysbenchload {
     public static void main (String[] args) throws Exception {
         if (args.length != 13) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password]");
             System.exit(1);
         }
 
@@ -72,6 +75,8 @@ public class jmongosysbenchload {
         myWriteConcern = args[10];
         serverName = args[11];
         serverPort = Integer.valueOf(args[12]);
+        userName = args[13];
+        passWord = args[14];
 
         WriteConcern myWC = new WriteConcern();
         if (myWriteConcern.toLowerCase().equals("fsync_safe")) {
@@ -107,14 +112,12 @@ public class jmongosysbenchload {
         logMe("  logging to file %s",logFileName);
         logMe("  write concern = %s",myWriteConcern);
         logMe("  Server:Port = %s:%d",serverName,serverPort);
+        logMe("  Username = %s",userName)
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-        //MongoClient m = new MongoClient(srvrAdd, clientOptions, Arrays.asList(credential));
-        connectString = ("mongodb://dba:dba@%s/admin", serverName);
-        MongoClient mongo = new MongoClient(
-            new MongoClientURI( connectString )
-        );
+        MongoCredential credential = MongoCredential.createMongoCRCredential(userName, dbName, passWord.toCharArray());
+        MongoClient m = new MongoClient(srvrAdd, Arrays.asList(credential));
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
         logMe("mongoWriteConcern | " + m.getWriteConcern().toString());

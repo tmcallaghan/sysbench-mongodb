@@ -1,5 +1,6 @@
 //import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
+import com.mongodb.MongoCredential;
 import com.mongodb.MongoClientOptions;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -54,6 +55,8 @@ public class jmongosysbenchexecute {
     public static Integer maxThreadTPS;
     public static String serverName;
     public static int serverPort;
+    public static String userName;
+    public static String passWord;
 
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -100,6 +103,8 @@ public class jmongosysbenchexecute {
         maxTPS = Integer.valueOf(args[17]);
         serverName = args[18];
         serverPort = Integer.valueOf(args[19]);
+        userName = args[13];
+        passWord = args[14];
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
 
@@ -147,14 +152,12 @@ public class jmongosysbenchexecute {
         logMe("  maximum tps (global)     = %d",maxTPS);
         logMe("  maximum tps (per thread) = %d",maxThreadTPS);
         logMe("  Server:Port = %s:%d",serverName,serverPort);
+        logMe("  userName                 = %s",userName);
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-        //MongoClient m = new MongoClient(srvrAdd, clientOptions, Arrays.asList(credential));
-        connectString = ("mongodb://dba:dba@%s/admin", serverName);
-        MongoClient mongo = new MongoClient(
-            new MongoClientURI( connectString )
-        );
+        MongoCredential credential = MongoCredential.createMongoCRCredential(userName, dbName, passWord.toCharArray());
+        MongoClient m = new MongoClient(srvrAdd, Arrays.asList(credential));
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
         logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
