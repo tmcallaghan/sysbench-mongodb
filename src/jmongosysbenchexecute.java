@@ -75,11 +75,11 @@ public class jmongosysbenchexecute {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 20) {
+        if (args.length != 22) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
                                    "[log file name] [read only Y/N] [runtime (seconds)] [range size] [point selects] "+
-                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [writeconcern] [max tps] [server] [port]");
+                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [writeconcern] [max tps] [server] [port] [username] [password]");
             System.exit(1);
         }
 
@@ -103,8 +103,8 @@ public class jmongosysbenchexecute {
         maxTPS = Integer.valueOf(args[17]);
         serverName = args[18];
         serverPort = Integer.valueOf(args[19]);
-        userName = args[13];
-        passWord = args[14];
+        userName = args[20];
+        passWord = args[21];
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
 

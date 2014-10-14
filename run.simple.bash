@@ -16,7 +16,7 @@ export NUM_COLLECTIONS=16
 
 # number of documents to maintain per collection
 #   valid values : integer > 0
-export NUM_DOCUMENTS_PER_COLLECTION=10000000
+export NUM_DOCUMENTS_PER_COLLECTION=1000000
 
 # total number of documents to insert per "batch"
 #   valid values : integer > 0
