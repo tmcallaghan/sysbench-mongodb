@@ -112,7 +112,7 @@ public class jmongosysbenchload {
         logMe("  logging to file %s",logFileName);
         logMe("  write concern = %s",myWriteConcern);
         logMe("  Server:Port = %s:%d",serverName,serverPort);
-        logMe("  Username = %s",userName)
+        logMe("  Username = %s",userName);
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
