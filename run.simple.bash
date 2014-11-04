@@ -3,11 +3,13 @@
 # simple script to run against running MongoDB/TokuMX server localhost:(default port)
 
 # enable passing different config files
-if [ "$1" != "" ];
+
+if [ ! $1 ];
 then
-    $FILE = config.bash
+    FILE="config.bash"
 else
-    $FILE = $1
+    FILE=$1
+fi
 
 if [ -f $FILE ];
 then
@@ -15,6 +17,7 @@ then
    source $FILE
 else
    echo "Unable to read config $FILE"
+   exit 1
 fi
 
 # compile source
