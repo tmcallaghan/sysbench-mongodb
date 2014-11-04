@@ -23,11 +23,6 @@ fi
 export CLASSPATH=/root/sysbench/mongo-java-driver-2.11.4.jar:$CLASSPATH
 export CLASSPATH=/root/sysbench/src:$CLASSPATH
 
-# compile source
-
-export CLASSPATH=/root/sysbench/mongo-java-driver-2.11.4.jar:$CLASSPATH
-export CLASSPATH=/root/sysbench/src:$CLASSPATH
-
 echo $CLASSPATH
 
 javac -cp $CLASSPATH:$PWD/src src/jmongosysbenchload.java
