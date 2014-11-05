@@ -1,6 +1,25 @@
+
+# You will most likely want to change these values
+
+# database in which to run the benchmark
+export DB_NAME=sbtest
+
+# database username on DB_NAME
+export USERNAME=myuser
+# database password to use for USERNAME
+export PASSWORD=mypass
+
+# name of the server to connect to
+export MONGO_SERVER=localhost
+
+# port of the server to connect to
+export MONGO_PORT=27017
+
+
+
 # if running TokuMX, need to select compression for collection and secondary indexes (zlib is default)
 #   valid values : lzma, quicklz, zlib, none
-export MONGO_COMPRESSION=zlib
+export MONGO_COMPRESSION=quicklz
 
 # if running TokuMX, need to select basement node size (65536 is default)
 #   valid values : integer > 0 : 65536 for 64K
@@ -31,15 +50,6 @@ export NUM_WRITER_THREADS=64
 export RUN_TIME_MINUTES=10
 export RUN_TIME_SECONDS=$[RUN_TIME_MINUTES*60]
 
-# database in which to run the benchmark
-#   valid values : character
-export DB_NAME=sbtest
-
-# database username on DB_NAME
-export USERNAME=dba
-# database password to use for USERNAME
-export PASSWORD=dba
-
 # write concern for the benchmark client
 #   valid values : FSYNC_SAFE, NONE, NORMAL, REPLICAS_SAFE, SAFE
 export WRITE_CONCERN=SAFE
@@ -55,12 +65,6 @@ export NUM_INSERTS_PER_FEEDBACK=-1
 # display performance information every time the client application has run for this many seconds
 #   valid values : integer > 0, set to -1 if using NUM_INSERTS_PER_FEEDBACK
 export NUM_SECONDS_PER_FEEDBACK=10
-
-# name of the server to connect to
-export MONGO_SERVER=localhost
-
-# port of the server to connect to
-export MONGO_PORT=27017
 
 # set to Y to run in "read only" mode, just queries
 #   valid values : N or Y
