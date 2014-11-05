@@ -12,15 +12,32 @@ Requirements
     * wget http://central.maven.org/maven2/org/mongodb/mongo-java-driver/2.11.4/mongo-java-driver-2.11.4.jar
     * export CLASSPATH=$PWD/mongo-java-driver-2.11.4.jar:$CLASSPATH
 * This example assumes that you already have a MongoDB or TokuMX server running on the same machine as the Sysbench client application.
-* You can connect a different server or port by editing the run.simple.bash script. 
+* You can connect a different server or port by editing the run.simple.bash script.
 
 
 Running the benchmark
 =====================
 
-In the default configuration the benchmark creates 16 collections, each with 10 million documents.
+In the default configuration the benchmark creates 16 collections, each with 10 million documents. You may want to watch the size of the database relative to your memory size to ensure you are testing just a memory based workload vs a workload that is exceeding memory and utilizing disk as well. All options are configurable in config.bash (or custom config file with the same options)
 
-* git clone https://github.com/tmcallaghan/sysbench-mongodb.git
-* cd sysbench-mongodb
-* *[optionally edit run.simple.bash to modify the benchmark behavior]*
-* ./run.simple.bash
+To run:
+
+```bash
+git clone https://github.com/tmcallaghan/sysbench-mongodb.git
+cd sysbench-mongodb
+
+```
+
+* edit config.bash to match your environment. You will most likely want to change the server, port and creds for your database.
+
+```bash
+./run.simple.bash
+
+```
+
+If you want to have multiple config files you can simply copy config.bash and specify the config you would like on the command line:
+
+```bash
+./run.simple.bash my_custom_config.bash
+
+```
