@@ -1,3 +1,8 @@
+import com.codahale.metrics.*;
+import org.apache.log4j.BasicConfigurator;
+import java.util.concurrent.TimeUnit;
+import java.util.Locale;
+
 //import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
@@ -30,12 +35,14 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class jmongosysbenchexecute {
-    public static AtomicLong globalInserts = new AtomicLong(0);
-    public static AtomicLong globalDeletes = new AtomicLong(0);
-    public static AtomicLong globalUpdates = new AtomicLong(0);
-    public static AtomicLong globalPointQueries = new AtomicLong(0);
-    public static AtomicLong globalRangeQueries = new AtomicLong(0);
-    public static AtomicLong globalSysbenchTransactions = new AtomicLong(0);
+    static final MetricRegistry metrics = new MetricRegistry();
+    private final Timer insertLatencies = metrics.timer(MetricRegistry.name("sysbench", "inserts"));
+    private final Timer deleteLatencies = metrics.timer(MetricRegistry.name("sysbench", "deletes"));
+    private final Timer updateLatencies = metrics.timer(MetricRegistry.name("sysbench", "updates"));
+    private final Timer pointQueryLatencies = metrics.timer(MetricRegistry.name("sysbench", "ptqueries"));
+    private final Timer rangeQueryLatencies = metrics.timer(MetricRegistry.name("sysbench", "rgqueries"));
+    private final Timer globalSysbenchTransactions = metrics.timer(MetricRegistry.name("sysbench", "tps"));
+
     public static AtomicLong globalWriterThreads = new AtomicLong(0);
 
     public static Writer writer = null;
@@ -78,6 +85,8 @@ public class jmongosysbenchexecute {
     }
 
     public static void main (String[] args) throws Exception {
+        BasicConfigurator.configure();
+
         if (args.length != 24) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
@@ -172,6 +181,19 @@ public class jmongosysbenchexecute {
 
         DB db = m.getDB(dbName);
 
+        final ConsoleReporter consoleReporter = ConsoleReporter.forRegistry(metrics)
+            .convertRatesTo(TimeUnit.SECONDS)
+            .convertDurationsTo(TimeUnit.MILLISECONDS)
+            .build();
+        consoleReporter.start(10, TimeUnit.SECONDS);
+
+        final CsvReporter csvReporter = CsvReporter.forRegistry(metrics)
+            .formatFor(Locale.US)
+            .convertRatesTo(TimeUnit.SECONDS)
+            .convertDurationsTo(TimeUnit.MILLISECONDS)
+            .build(new File(logFileName));
+        csvReporter.start(1, TimeUnit.SECONDS);
+
         // determine server type : mongo or tokumx
         DBObject checkServerCmd = new BasicDBObject();
         CommandResult commandResult = db.command("buildInfo");
@@ -187,12 +209,6 @@ public class jmongosysbenchexecute {
 
         logMe("  index technology         = %s",indexTechnology);
         logMe("-------------------------------------------------------------------------------------------------");
-
-        try {
-            writer = new BufferedWriter(new FileWriter(new File(logFileName)));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
         if ((!indexTechnology.toLowerCase().equals("tokumx")) && (!indexTechnology.toLowerCase().equals("mongo"))) {
             // unknown index technology, abort
@@ -213,22 +229,10 @@ public class jmongosysbenchexecute {
             tWriterThreads[i].start();
         }
 
-        Thread reporterThread = new Thread(t.new MyReporter());
-        reporterThread.start();
-        reporterThread.join();
-
         // wait for writer threads to terminate
         for (int i=0; i<writerThreads; i++) {
             if (tWriterThreads[i].isAlive())
                 tWriterThreads[i].join();
-        }
-
-        try {
-            if (writer != null) {
-                writer.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
 
         m.close();
@@ -293,6 +297,7 @@ public class jmongosysbenchexecute {
                 String collectionName = "sbtest" + Integer.toString(rand.nextInt(numCollections)+1);
                 DBCollection coll = db.getCollection(collectionName);
 
+                final Timer.Context txnContext = globalSysbenchTransactions.time();
                 try {
                     if (bIsTokuMX && !auto_commit) {
                         // make sure a connection is available, given that we are not pooling
@@ -311,10 +316,12 @@ public class jmongosysbenchexecute {
                         BasicDBObject query = new BasicDBObject("_id", startId);
                         BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
 
-                        DBObject myDoc = coll.findOne(query, columns);
-                        //System.out.println(myDoc);
-
-                        globalPointQueries.incrementAndGet();
+                        final Timer.Context context = pointQueryLatencies.time();
+                        try {
+                            DBObject myDoc = coll.findOne(query, columns);
+                        } finally {
+                            context.stop();
+                        }
                     }
 
                     for (int i=1; i <= oltpSimpleRanges; i++) {
@@ -330,17 +337,21 @@ public class jmongosysbenchexecute {
 
                         BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
                         BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
-                        DBCursor cursor = coll.find(query, columns);
+
+                        final Timer.Context context = rangeQueryLatencies.time();
                         try {
-                            while(cursor.hasNext()) {
-                                cursor.next();
-                                //System.out.println(cursor.next());
+                            DBCursor cursor = coll.find(query, columns);
+                            try {
+                                while(cursor.hasNext()) {
+                                    cursor.next();
+                                    //System.out.println(cursor.next());
+                                }
+                            } finally {
+                                cursor.close();
                             }
                         } finally {
-                            cursor.close();
+                            context.stop();
                         }
-
-                        globalRangeQueries.incrementAndGet();
                     }
 
                     for (int i=1; i <= oltpSumRanges; i++) {
@@ -367,12 +378,15 @@ public class jmongosysbenchexecute {
                         groupFields.put("average", new BasicDBObject( "$sum", "$k"));
                         DBObject group = new BasicDBObject("$group", groupFields);
 
-                        // run aggregation
-                        AggregationOutput output = coll.aggregate( match, project, group );
+                        final Timer.Context context = rangeQueryLatencies.time();
+                        try {
+                            // run aggregation
+                            AggregationOutput output = coll.aggregate( match, project, group );
 
-                        //System.out.println(output.getCommandResult());
-
-                        globalRangeQueries.incrementAndGet();
+                            //System.out.println(output.getCommandResult());
+                        } finally {
+                            context.stop();
+                        }
                     }
 
                     for (int i=1; i <= oltpOrderRanges; i++) {
@@ -388,17 +402,21 @@ public class jmongosysbenchexecute {
 
                         BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
                         BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
-                        DBCursor cursor = coll.find(query, columns).sort(new BasicDBObject("c",1));
+
+                        final Timer.Context context = rangeQueryLatencies.time();
                         try {
-                            while(cursor.hasNext()) {
-                                cursor.next();
-                                //System.out.println(cursor.next());
+                            DBCursor cursor = coll.find(query, columns).sort(new BasicDBObject("c",1));
+                            try {
+                                while(cursor.hasNext()) {
+                                    cursor.next();
+                                    //System.out.println(cursor.next());
+                                }
+                            } finally {
+                                cursor.close();
                             }
                         } finally {
-                            cursor.close();
+                            context.stop();
                         }
-
-                        globalRangeQueries.incrementAndGet();
                     }
 
                     for (int i=1; i <= oltpDistinctRanges; i++) {
@@ -414,10 +432,14 @@ public class jmongosysbenchexecute {
 
                         BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
                         BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
-                        List lstDistinct = coll.distinct("c", query);
-                        //System.out.println(lstDistinct.toString());
 
-                        globalRangeQueries.incrementAndGet();
+                        final Timer.Context context = rangeQueryLatencies.time();
+                        try {
+                            List lstDistinct = coll.distinct("c", query);
+                            //System.out.println(lstDistinct.toString());
+                        } finally {
+                            context.stop();
+                        }
                     }
 
                     for (int i=1; i <= oltpIndexUpdates; i++) {
@@ -429,9 +451,14 @@ public class jmongosysbenchexecute {
 
                         int startId = rand.nextInt(numMaxInserts)+1;
 
-                        WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$inc", new BasicDBObject("k",1)), false, false);
+                        final Timer.Context context = updateLatencies.time();
+                        try {
+                            WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$inc", new BasicDBObject("k",1)), false, false);
     
-                        //System.out.println(wrUpdate.toString());
+                            //System.out.println(wrUpdate.toString());
+                        } finally {
+                            context.stop();
+                        }
                     }
     
                     for (int i=1; i <= oltpNonIndexUpdates; i++) {
@@ -450,9 +477,14 @@ public class jmongosysbenchexecute {
 
                         String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
 
-                        WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$set", new BasicDBObject("c",cVal)), false, false);
+                        final Timer.Context context = updateLatencies.time();
+                        try {
+                            WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$set", new BasicDBObject("c",cVal)), false, false);
 
-                        //System.out.println(wrUpdate.toString());
+                            //System.out.println(wrUpdate.toString());
+                        } finally {
+                            context.stop();
+                        }
                     }
 
                     for (int i=1; i <= oltpInserts; i++) {
@@ -476,10 +508,15 @@ public class jmongosysbenchexecute {
                         doc.put("c",cVal);
                         String padVal = sysbenchString(rand, "###########-###########-###########-###########-###########");
                         doc.put("pad",padVal);
-                        WriteResult wrInsert = coll.insert(doc);
+
+                        final Timer.Context context = insertLatencies.time();
+                        try {
+                            WriteResult wrInsert = coll.insert(doc);
+                        } finally {
+                            context.stop();
+                        }
                     }
 
-                    globalSysbenchTransactions.incrementAndGet();
                     numTransactions += 1;
 
                 } finally {
@@ -489,6 +526,7 @@ public class jmongosysbenchexecute {
                         //--db.command("rollbackTransaction")
                         db.requestDone();
                     }
+                    txnContext.stop();
                 }
             }
 
@@ -516,100 +554,6 @@ public class jmongosysbenchexecute {
         }
         return sb.toString();
     }
-
-
-    // reporting thread, outputs information to console and file
-    class MyReporter implements Runnable {
-        public void run()
-        {
-            long t0 = System.currentTimeMillis();
-            long lastInserts = 0;
-            long thisInserts = 0;
-            long lastDeletes = 0;
-            long thisDeletes = 0;
-            long lastUpdates = 0;
-            long thisUpdates = 0;
-            long lastPointQueries = 0;
-            long thisPointQueries = 0;
-            long lastRangeQueries = 0;
-            long thisRangeQueries = 0;
-            long lastSysbenchTransactions = 0;
-            long thisSysbenchTransactions = 0;
-            long lastMs = t0;
-            long intervalNumber = 0;
-            long nextFeedbackMillis = t0 + (1000 * secondsPerFeedback * (intervalNumber + 1));
-            long runEndMillis = Long.MAX_VALUE;
-            if (runSeconds > 0)
-                runEndMillis = t0 + (1000 * runSeconds);
-
-            while ((System.currentTimeMillis() < runEndMillis) && (thisInserts < numMaxInserts))
-            {
-                try {
-                    Thread.sleep(100);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-                long now = System.currentTimeMillis();
-
-
-//    public static AtomicLong globalDeletes = new AtomicLong(0);
-//    public static AtomicLong globalUpdates = new AtomicLong(0);
-//    public static AtomicLong globalPointQueries = new AtomicLong(0);
-//    public static AtomicLong globalRangeQueries = new AtomicLong(0);
-
-
-                thisInserts = globalInserts.get();
-                thisSysbenchTransactions = globalSysbenchTransactions.get();
-
-                if ((now > nextFeedbackMillis) && (secondsPerFeedback > 0))
-                {
-                    intervalNumber++;
-                    nextFeedbackMillis = t0 + (1000 * secondsPerFeedback * (intervalNumber + 1));
-
-                    long elapsed = now - t0;
-                    long thisIntervalMs = now - lastMs;
-                    long thisWriterThreads = globalWriterThreads.get();
-
-                    long thisIntervalSysbenchTransactions = thisSysbenchTransactions - lastSysbenchTransactions;
-                    double thisIntervalSysbenchTransactionsPerSecond = thisIntervalSysbenchTransactions/(double)thisIntervalMs*1000.0;
-                    double thisSysbenchTransactionsPerSecond = thisSysbenchTransactions/(double)elapsed*1000.0;
-
-                    long thisIntervalInserts = thisInserts - lastInserts;
-                    double thisIntervalInsertsPerSecond = thisIntervalInserts/(double)thisIntervalMs*1000.0;
-                    double thisInsertsPerSecond = thisInserts/(double)elapsed*1000.0;
-                    
-                    logMe("%,d seconds : cum tps=%,.2f : int tps=%,.2f : cum ips=%,.2f : int ips=%,.2f : writers=%,d", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisWriterThreads);
-                    
-                    try {
-                        if (outputHeader)
-                        {
-                            writer.write("elap_secs\tcum_tps\tint_tps\tcum_ips\tint_ips\n");
-                            outputHeader = false;
-                        }
-
-                        String statusUpdate = "";
-
-                        statusUpdate = String.format("%d\t%.2f\t%.2f\t%.2f\t%.2f\n", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
-
-                        writer.write(statusUpdate);
-                        writer.flush();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                    lastInserts = thisInserts;
-                    lastSysbenchTransactions = thisSysbenchTransactions;
-
-                    lastMs = now;
-                }
-            }
-
-            // shutdown all the writers
-            allDone = 1;
-        }
-    }
-
 
     public static void logMe(String format, Object... args) {
         System.out.println(Thread.currentThread() + String.format(format, args));

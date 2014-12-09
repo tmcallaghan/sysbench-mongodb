@@ -1,3 +1,8 @@
+import com.codahale.metrics.*;
+import org.apache.log4j.BasicConfigurator;
+import java.util.concurrent.TimeUnit;
+import java.util.Locale;
+
 //import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
@@ -27,10 +32,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class jmongosysbenchload {
-    public static AtomicLong globalInserts = new AtomicLong(0);
+    static final MetricRegistry metrics = new MetricRegistry();
+    private final Timer insertLatencies = metrics.timer(MetricRegistry.name("sysbench", "inserts"));
+
     public static AtomicLong globalWriterThreads = new AtomicLong(0);
 
-    public static Writer writer = null;
     public static boolean outputHeader = true;
 
     public static int numCollections;
@@ -56,6 +62,8 @@ public class jmongosysbenchload {
     }
 
     public static void main (String[] args) throws Exception {
+        BasicConfigurator.configure();
+
         if (args.length != 15) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password]");
@@ -124,6 +132,19 @@ public class jmongosysbenchload {
 
         DB db = m.getDB(dbName);
 
+        final ConsoleReporter consoleReporter = ConsoleReporter.forRegistry(metrics)
+            .convertRatesTo(TimeUnit.SECONDS)
+            .convertDurationsTo(TimeUnit.MILLISECONDS)
+            .build();
+        consoleReporter.start(10, TimeUnit.SECONDS);
+
+        final CsvReporter csvReporter = CsvReporter.forRegistry(metrics)
+            .formatFor(Locale.US)
+            .convertRatesTo(TimeUnit.SECONDS)
+            .convertDurationsTo(TimeUnit.MILLISECONDS)
+            .build(new File(logFileName));
+        csvReporter.start(1, TimeUnit.SECONDS);
+
         // determine server type : mongo or tokumx
         DBObject checkServerCmd = new BasicDBObject();
         CommandResult commandResult = db.command("buildInfo");
@@ -146,12 +167,6 @@ public class jmongosysbenchload {
 
         logMe("--------------------------------------------------");
 
-        try {
-            writer = new BufferedWriter(new FileWriter(new File(logFileName)));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
         if ((!indexTechnology.toLowerCase().equals("tokumx")) && (!indexTechnology.toLowerCase().equals("mongo"))) {
             // unknown index technology, abort
             logMe(" *** Unknown Indexing Technology %s, shutting down",indexTechnology);
@@ -159,9 +174,6 @@ public class jmongosysbenchload {
         }
 
         jmongosysbenchload t = new jmongosysbenchload();
-
-        Thread reporterThread = new Thread(t.new MyReporter());
-        reporterThread.start();
 
         Thread[] tWriterThreads = new Thread[writerThreads];
 
@@ -214,17 +226,6 @@ public class jmongosysbenchload {
 
         // all the writers are finished
         allDone = 1;
-
-        if (reporterThread.isAlive())
-            reporterThread.join();
-
-        try {
-            if (writer != null) {
-                writer.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
         // m.dropDatabase("mydb");
 
@@ -310,9 +311,13 @@ public class jmongosysbenchload {
                         aDocs[i]=doc;
                     }
 
-                    coll.insert(aDocs);
-                    numInserts += documentsPerInsert;
-                    globalInserts.addAndGet(documentsPerInsert);
+                    final Timer.Context context = insertLatencies.time();
+                    try {
+                        coll.insert(aDocs);
+                        numInserts += documentsPerInsert;
+                    } finally {
+                        context.stop();
+                    }
                 }
 
             } catch (Exception e) {
@@ -339,117 +344,6 @@ public class jmongosysbenchload {
         }
         return sb.toString();
     }
-
-
-    // reporting thread, outputs information to console and file
-    class MyReporter implements Runnable {
-        public void run()
-        {
-            long t0 = System.currentTimeMillis();
-            long lastInserts = 0;
-            long lastMs = t0;
-            long intervalNumber = 0;
-            long nextFeedbackMillis = t0 + (1000 * secondsPerFeedback * (intervalNumber + 1));
-            long nextFeedbackInserts = lastInserts + insertsPerFeedback;
-            long thisInserts = 0;
-
-            while (allDone == 0)
-            {
-                try {
-                    Thread.sleep(100);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-                long now = System.currentTimeMillis();
-                thisInserts = globalInserts.get();
-                if (((now > nextFeedbackMillis) && (secondsPerFeedback > 0)) ||
-                    ((thisInserts >= nextFeedbackInserts) && (insertsPerFeedback > 0)))
-                {
-                    intervalNumber++;
-                    nextFeedbackMillis = t0 + (1000 * secondsPerFeedback * (intervalNumber + 1));
-                    nextFeedbackInserts = (intervalNumber + 1) * insertsPerFeedback;
-
-                    long elapsed = now - t0;
-                    long thisIntervalMs = now - lastMs;
-
-                    long thisIntervalInserts = thisInserts - lastInserts;
-                    double thisIntervalInsertsPerSecond = thisIntervalInserts/(double)thisIntervalMs*1000.0;
-                    double thisInsertsPerSecond = thisInserts/(double)elapsed*1000.0;
-
-                    if (secondsPerFeedback > 0)
-                    {
-                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f", thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
-                    } else {
-                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f", intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
-                    }
-
-                    try {
-                        if (outputHeader)
-                        {
-                            writer.write("tot_inserts\telap_secs\tcum_ips\tint_ips\n");
-                            outputHeader = false;
-                        }
-
-                        String statusUpdate = "";
-
-                        if (secondsPerFeedback > 0)
-                        {
-                            statusUpdate = String.format("%d\t%d\t%.2f\t%.2f\n",thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
-                        } else {
-                            statusUpdate = String.format("%d\t%d\t%.2f\t%.2f\n",intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
-                        }
-                        writer.write(statusUpdate);
-                        writer.flush();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                    lastInserts = thisInserts;
-
-                    lastMs = now;
-                }
-            }
-
-            // output final numbers...
-            long now = System.currentTimeMillis();
-            thisInserts = globalInserts.get();
-            intervalNumber++;
-            nextFeedbackMillis = t0 + (1000 * secondsPerFeedback * (intervalNumber + 1));
-            nextFeedbackInserts = (intervalNumber + 1) * insertsPerFeedback;
-            long elapsed = now - t0;
-            long thisIntervalMs = now - lastMs;
-            long thisIntervalInserts = thisInserts - lastInserts;
-            double thisIntervalInsertsPerSecond = thisIntervalInserts/(double)thisIntervalMs*1000.0;
-            double thisInsertsPerSecond = thisInserts/(double)elapsed*1000.0;
-            if (secondsPerFeedback > 0)
-            {
-                logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f", thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
-            } else {
-                logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f", intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
-            }
-            try {
-                if (outputHeader)
-                {
-                    writer.write("tot_inserts\telap_secs\tcum_ips\tint_ips\n");
-                    outputHeader = false;
-                }
-                String statusUpdate = "";
-                if (secondsPerFeedback > 0)
-                {
-                    statusUpdate = String.format("%d\t%d\t%.2f\t%.2f\n",thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
-                } else {
-                    statusUpdate = String.format("%d\t%d\t%.2f\t%.2f\n",intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
-                }
-                writer.write(statusUpdate);
-                writer.flush();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-        }
-    }
-
 
     public static void logMe(String format, Object... args) {
         System.out.println(Thread.currentThread() + String.format(format, args));
