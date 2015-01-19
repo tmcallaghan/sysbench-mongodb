@@ -116,7 +116,7 @@ public class jmongosysbenchload {
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-        MongoCredential credential = MongoCredential.createMongoCRCredential(userName, dbName, passWord.toCharArray());
+        MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
         MongoClient m = new MongoClient(srvrAdd, Arrays.asList(credential));
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
@@ -327,8 +327,8 @@ public class jmongosysbenchload {
 
     public static String sysbenchString(java.util.Random rand, String thisMask) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0, n = thisMask.length() ; i < n ; i++) { 
-            char c = thisMask.charAt(i); 
+        for (int i = 0, n = thisMask.length() ; i < n ; i++) {
+            char c = thisMask.charAt(i);
             if (c == '#') {
                 sb.append(String.valueOf(rand.nextInt(10)));
             } else if (c == '@') {
