@@ -48,7 +48,7 @@ public class jmongosysbenchexecute {
     public static long secondsPerFeedback;
     public static String logFileName;
     public static String indexTechnology;
-    public static String autoCommit;
+    public static String readOnly;
     public static int runSeconds;
     public static String myWriteConcern;
     public static Integer maxTPS;
@@ -66,34 +66,30 @@ public class jmongosysbenchexecute {
     public static int oltpDistinctRanges;
     public static int oltpIndexUpdates;
     public static int oltpNonIndexUpdates;
-    public static int oltpInserts;
 
     public static boolean bIsTokuMX = false;
 
     public static int allDone = 0;
 
-    public static long rngSeed = 0;
-    
     public jmongosysbenchexecute() {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 24) {
+        if (args.length != 22) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
-                                   "[log file name] [auto commit Y/N] [runtime (seconds)] [range size] [point selects] "+
-                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [inserts] [writeconcern] "+
-                                   "[max tps] [server] [port] [seed] [username] [password]");
+                                   "[log file name] [read only Y/N] [runtime (seconds)] [range size] [point selects] "+
+                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [writeconcern] [max tps] [server] [port] [username] [password]");
             System.exit(1);
         }
-        
+
         numCollections = Integer.valueOf(args[0]);
         dbName = args[1];
         writerThreads = Integer.valueOf(args[2]);
         numMaxInserts = Integer.valueOf(args[3]);
         secondsPerFeedback = Long.valueOf(args[4]);
         logFileName = args[5];
-        autoCommit = args[6];
+        readOnly = args[6];
         runSeconds = Integer.valueOf(args[7]);
         oltpRangeSize = Integer.valueOf(args[8]);
         oltpPointSelects = Integer.valueOf(args[9]);
@@ -103,14 +99,12 @@ public class jmongosysbenchexecute {
         oltpDistinctRanges = Integer.valueOf(args[13]);
         oltpIndexUpdates = Integer.valueOf(args[14]);
         oltpNonIndexUpdates = Integer.valueOf(args[15]);
-        oltpInserts = Integer.valueOf(args[16]);
-        myWriteConcern = args[17];
-        maxTPS = Integer.valueOf(args[18]);
-        serverName = args[19];
-        serverPort = Integer.valueOf(args[20]);
-        rngSeed = Long.valueOf(args[21]);
-        userName = args[22];
-        passWord = args[23];
+        myWriteConcern = args[16];
+        maxTPS = Integer.valueOf(args[17]);
+        serverName = args[18];
+        serverPort = Integer.valueOf(args[19]);
+        userName = args[20];
+        passWord = args[21];
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
 
@@ -124,7 +118,7 @@ public class jmongosysbenchexecute {
         else if ((myWriteConcern.toLowerCase().equals("normal"))) {
             myWC = WriteConcern.NORMAL;
         }
-        else if ((myWriteConcern.toLowerCase().equals("replicas_safe"))) {
+        else if ((myWriteConcern.toLowerCase().equals("f"))) {
             myWC = WriteConcern.REPLICAS_SAFE;
         }
         else if ((myWriteConcern.toLowerCase().equals("safe"))) {
@@ -144,7 +138,7 @@ public class jmongosysbenchexecute {
         logMe("  documents per collection = %,d",numMaxInserts);
         logMe("  feedback seconds         = %,d",secondsPerFeedback);
         logMe("  log file                 = %s",logFileName);
-        logMe("  auto commit              = %s",autoCommit);
+        logMe("  read only                = %s",readOnly);
         logMe("  run seconds              = %d",runSeconds);
         logMe("  oltp range size          = %d",oltpRangeSize);
         logMe("  oltp point selects       = %d",oltpPointSelects);
@@ -154,17 +148,15 @@ public class jmongosysbenchexecute {
         logMe("  oltp distinct ranges     = %d",oltpDistinctRanges);
         logMe("  oltp index updates       = %d",oltpIndexUpdates);
         logMe("  oltp non index updates   = %d",oltpNonIndexUpdates);
-        logMe("  oltp inserts             = %d",oltpInserts);
         logMe("  write concern            = %s",myWriteConcern);
         logMe("  maximum tps (global)     = %d",maxTPS);
         logMe("  maximum tps (per thread) = %d",maxThreadTPS);
         logMe("  Server:Port = %s:%d",serverName,serverPort);
-        logMe("  seed                     = %d",rngSeed);
         logMe("  userName                 = %s",userName);
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-        MongoCredential credential = MongoCredential.createMongoCRCredential(userName, dbName, passWord.toCharArray());
+        MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
         MongoClient m = new MongoClient(srvrAdd, Arrays.asList(credential));
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
@@ -209,7 +201,7 @@ public class jmongosysbenchexecute {
         Thread[] tWriterThreads = new Thread[writerThreads];
 
         for (int i=0; i<writerThreads; i++) {
-            tWriterThreads[i] = new Thread(t.new MyWriter(writerThreads, i, numMaxInserts, db, numCollections, rngSeed));
+            tWriterThreads[i] = new Thread(t.new MyWriter(writerThreads, i, numMaxInserts, db, numCollections));
             tWriterThreads[i].start();
         }
 
@@ -251,14 +243,14 @@ public class jmongosysbenchexecute {
         long numRangeQueries = 0;
 
         java.util.Random rand;
-        
-        MyWriter(int threadCount, int threadNumber, int numMaxInserts, DB db, int numCollections, long rngSeed) {
+
+        MyWriter(int threadCount, int threadNumber, int numMaxInserts, DB db, int numCollections) {
             this.threadCount = threadCount;
             this.threadNumber = threadNumber;
             this.numMaxInserts = numMaxInserts;
             this.db = db;
             this.numCollections = numCollections;
-            rand = new java.util.Random((long) threadNumber + rngSeed);
+            rand = new java.util.Random((long) threadNumber);
         }
         public void run() {
             logMe("Writer thread %d : started",threadNumber);
@@ -267,8 +259,6 @@ public class jmongosysbenchexecute {
             long numTransactions = 0;
             long numLastTransactions = 0;
             long nextMs = System.currentTimeMillis() + 1000;
-
-            boolean auto_commit = !autoCommit.toLowerCase().equals("n");
 
             while (allDone == 0) {
                 if ((numTransactions - numLastTransactions) >= maxThreadTPS) {
@@ -285,7 +275,7 @@ public class jmongosysbenchexecute {
                 }
 
                 // if TokuMX, lock onto current connection (do not pool)
-                if (bIsTokuMX && !auto_commit) {
+                if (bIsTokuMX) {
                     db.requestStart();
                     db.command("beginTransaction");
                 }
@@ -294,7 +284,7 @@ public class jmongosysbenchexecute {
                 DBCollection coll = db.getCollection(collectionName);
 
                 try {
-                    if (bIsTokuMX && !auto_commit) {
+                    if (bIsTokuMX) {
                         // make sure a connection is available, given that we are not pooling
                         db.requestEnsureConnection();
                     }
@@ -420,50 +410,53 @@ public class jmongosysbenchexecute {
                         globalRangeQueries.incrementAndGet();
                     }
 
-                    for (int i=1; i <= oltpIndexUpdates; i++) {
-                        //for i=1, oltp_index_updates do
-                        //   rs = db_query("UPDATE " .. table_name .. " SET k=k+1 WHERE id=" .. sb_rand(1, oltp_table_size))
-                        //end
 
-                        //db.sbtest8.update({_id: 5523412}, {$inc: {k: 1}}, false, false)
+                    if (readOnly.toLowerCase().equals("n")) {
+                        for (int i=1; i <= oltpIndexUpdates; i++) {
+                            //for i=1, oltp_index_updates do
+                            //   rs = db_query("UPDATE " .. table_name .. " SET k=k+1 WHERE id=" .. sb_rand(1, oltp_table_size))
+                            //end
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                            //db.sbtest8.update({_id: 5523412}, {$inc: {k: 1}}, false, false)
 
-                        WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$inc", new BasicDBObject("k",1)), false, false);
-    
-                        //System.out.println(wrUpdate.toString());
-                    }
-    
-                    for (int i=1; i <= oltpNonIndexUpdates; i++) {
-                        //for i=1, oltp_non_index_updates do
-                        //   c_val = sb_rand_str("###########-###########-###########-###########-###########-###########-###########-###########-###########-###########")
-                        //   query = "UPDATE " .. table_name .. " SET c='" .. c_val .. "' WHERE id=" .. sb_rand(1, oltp_table_size)
-                        //   rs = db_query(query)
-                        //   if rs then
-                        //     print(query)
-                        //   end
-                        //end
+                            int startId = rand.nextInt(numMaxInserts)+1;
 
-                        //db.sbtest8.update({_id: 5523412}, {$set: {c: "hello there"}}, false, false)
+                            WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$inc", new BasicDBObject("k",1)), false, false);
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                            //System.out.println(wrUpdate.toString());
+                        }
 
-                        String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
+                        for (int i=1; i <= oltpNonIndexUpdates; i++) {
+                            //for i=1, oltp_non_index_updates do
+                            //   c_val = sb_rand_str("###########-###########-###########-###########-###########-###########-###########-###########-###########-###########")
+                            //   query = "UPDATE " .. table_name .. " SET c='" .. c_val .. "' WHERE id=" .. sb_rand(1, oltp_table_size)
+                            //   rs = db_query(query)
+                            //   if rs then
+                            //     print(query)
+                            //   end
+                            //end
 
-                        WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$set", new BasicDBObject("c",cVal)), false, false);
+                            //db.sbtest8.update({_id: 5523412}, {$set: {c: "hello there"}}, false, false)
 
-                        //System.out.println(wrUpdate.toString());
-                    }
+                            int startId = rand.nextInt(numMaxInserts)+1;
 
-                    for (int i=1; i <= oltpInserts; i++) {
+                            String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
+
+                            WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$set", new BasicDBObject("c",cVal)), false, false);
+
+                            //System.out.println(wrUpdate.toString());
+                        }
+
+
                         //i = sb_rand(1, oltp_table_size)
                         //rs = db_query("DELETE FROM " .. table_name .. " WHERE id=" .. i)
-                      
+
                         //db.sbtest8.remove({_id: 5523412})
 
                         int startId = rand.nextInt(numMaxInserts)+1;
 
                         WriteResult wrRemove = coll.remove(new BasicDBObject("_id", startId));
+
 
                         //c_val = sb_rand_str([[###########-###########-###########-###########-###########-###########-###########-###########-###########-###########]])
                         //pad_val = sb_rand_str([[###########-###########-###########-###########-###########]])
@@ -483,7 +476,7 @@ public class jmongosysbenchexecute {
                     numTransactions += 1;
 
                 } finally {
-                    if (bIsTokuMX && !auto_commit) {
+                    if (bIsTokuMX) {
                         // commit the transaction and release current connection in the pool
                         db.command("commitTransaction");
                         //--db.command("rollbackTransaction")
@@ -503,18 +496,18 @@ public class jmongosysbenchexecute {
 
 
     public static String sysbenchString(java.util.Random rand, String thisMask) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0, n = thisMask.length() ; i < n ; i++) { 
-            char c = thisMask.charAt(i); 
+        String returnString = "";
+        for (int i = 0, n = thisMask.length() ; i < n ; i++) {
+            char c = thisMask.charAt(i);
             if (c == '#') {
-                sb.append(String.valueOf(rand.nextInt(10)));
+                returnString += String.valueOf(rand.nextInt(10));
             } else if (c == '@') {
-                sb.append((char) (rand.nextInt(26) + 'a'));
+                returnString += (char) (rand.nextInt(26) + 'a');
             } else {
-                sb.append(c);
+                returnString += c;
             }
         }
-        return sb.toString();
+        return returnString;
     }
 
 
@@ -569,7 +562,6 @@ public class jmongosysbenchexecute {
 
                     long elapsed = now - t0;
                     long thisIntervalMs = now - lastMs;
-                    long thisWriterThreads = globalWriterThreads.get();
 
                     long thisIntervalSysbenchTransactions = thisSysbenchTransactions - lastSysbenchTransactions;
                     double thisIntervalSysbenchTransactionsPerSecond = thisIntervalSysbenchTransactions/(double)thisIntervalMs*1000.0;
@@ -578,9 +570,9 @@ public class jmongosysbenchexecute {
                     long thisIntervalInserts = thisInserts - lastInserts;
                     double thisIntervalInsertsPerSecond = thisIntervalInserts/(double)thisIntervalMs*1000.0;
                     double thisInsertsPerSecond = thisInserts/(double)elapsed*1000.0;
-                    
-                    logMe("%,d seconds : cum tps=%,.2f : int tps=%,.2f : cum ips=%,.2f : int ips=%,.2f : writers=%,d", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisWriterThreads);
-                    
+
+                    logMe("%,d seconds : cum tps=%,.2f : int tps=%,.2f : cum ips=%,.2f : int ips=%,.2f", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
+
                     try {
                         if (outputHeader)
                         {
