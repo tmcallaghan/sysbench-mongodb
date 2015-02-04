@@ -1,30 +1,22 @@
 //import com.mongodb.Mongo;
-import com.mongodb.MongoClient;
-import com.mongodb.MongoCredential;
-import com.mongodb.MongoClientOptions;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Writer;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicLong;
+
+import com.mongodb.BasicDBObject;
+import com.mongodb.CommandResult;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
-import com.mongodb.DBCursor;
-import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
-import com.mongodb.DBCursor;
+import com.mongodb.MongoClient;
+import com.mongodb.MongoClientOptions;
+import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 import com.mongodb.WriteConcern;
-import com.mongodb.CommandResult;
-
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Properties;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.File;
-import java.io.Writer;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class jmongosysbenchload {
     public static AtomicLong globalInserts = new AtomicLong(0);
@@ -116,8 +108,16 @@ public class jmongosysbenchload {
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-        MongoCredential credential = MongoCredential.createMongoCRCredential(userName, dbName, passWord.toCharArray());
-        MongoClient m = new MongoClient(srvrAdd, Arrays.asList(credential));
+        
+        // Credential login is optional.
+        MongoClient m;
+        if (userName.isEmpty() || userName.equalsIgnoreCase("none"))
+          m = new MongoClient(srvrAdd);
+        else
+        {
+          MongoCredential credential = MongoCredential.createMongoCRCredential(userName, dbName, passWord.toCharArray());
+          m = new MongoClient(srvrAdd, Arrays.asList(credential));
+        }
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
         logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
