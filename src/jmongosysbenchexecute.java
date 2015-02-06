@@ -157,15 +157,14 @@ public class jmongosysbenchexecute {
 
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-        
+
         // Credential login is optional.
         MongoClient m;
-        if (userName.isEmpty() || userName.equalsIgnoreCase("none"))
-          m = new MongoClient(srvrAdd);
-        else
-        {
-          MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
-          m = new MongoClient(srvrAdd, Arrays.asList(credential));
+        if (userName.isEmpty()) {
+            m = new MongoClient(srvrAdd);
+        } else {
+            MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
+            m = new MongoClient(srvrAdd, Arrays.asList(credential));
         }
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
