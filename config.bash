@@ -4,6 +4,8 @@
 export DB_NAME=sbtest
 
 # database username on DB_NAME
+#  Use USERNAME=none 
+#  to login to mongodb without using credentials.
 export USERNAME=myuser
 
 # database password to use for USERNAME
