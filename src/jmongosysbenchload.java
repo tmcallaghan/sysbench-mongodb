@@ -115,7 +115,7 @@ public class jmongosysbenchload {
           m = new MongoClient(srvrAdd);
         else
         {
-          MongoCredential credential = MongoCredential.createMongoCRCredential(userName, dbName, passWord.toCharArray());
+          MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
           m = new MongoClient(srvrAdd, Arrays.asList(credential));
         }
 
