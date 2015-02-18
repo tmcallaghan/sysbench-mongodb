@@ -160,7 +160,7 @@ public class jmongosysbenchexecute {
 
         // Credential login is optional.
         MongoClient m;
-        if (userName.isEmpty()) {
+        if (userName.isEmpty() || userName.equalsIgnoreCase("none")) {
             m = new MongoClient(srvrAdd);
         } else {
             MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
