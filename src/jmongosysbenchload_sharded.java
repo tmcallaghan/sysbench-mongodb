@@ -18,7 +18,7 @@ import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 import com.mongodb.WriteConcern;
 
-public class jmongosysbenchload {
+public class jmongosysbenchload_sharded {
     public static AtomicLong globalInserts = new AtomicLong(0);
     public static AtomicLong globalWriterThreads = new AtomicLong(0);
 
@@ -44,7 +44,7 @@ public class jmongosysbenchload {
 
     public static int allDone = 0;
 
-    public jmongosysbenchload() {
+    public jmongosysbenchload_sharded() {
     }
 
     public static void main (String[] args) throws Exception {
@@ -160,7 +160,7 @@ public class jmongosysbenchload {
             System.exit(1);
         }
 
-        jmongosysbenchload t = new jmongosysbenchload();
+        jmongosysbenchload_sharded t = new jmongosysbenchload_sharded();
 
         Thread reporterThread = new Thread(t.new MyReporter());
         reporterThread.start();
