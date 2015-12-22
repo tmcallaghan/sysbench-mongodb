@@ -6,16 +6,18 @@ export DB_NAME=sbtest
 # database username on DB_NAME
 #  Use USERNAME=none 
 #  to login to mongodb without using credentials.
-export USERNAME=myuser
+#export USERNAME=myuser
 
 # database password to use for USERNAME
-export PASSWORD=mypass
+#export PASSWORD=mypass
 
 # name of the server to connect to
 export MONGO_SERVER=localhost
 
 # port of the server to connect to
-export MONGO_PORT=27017
+#export MONGO_PORT=27017
+
+export MONGO_PORT=$(docker port mongos1 27017/tcp | cut -f2 -d":")
 
 # Use "yes" to load the collections
 DOLOAD=yes
