@@ -15,9 +15,9 @@ export DB_NAME=sbtest
 export MONGO_SERVER=localhost
 
 # port of the server to connect to
-export MONGO_PORT=27017
+#export MONGO_PORT=27017
 
-export MONGO_PORT=$(docker port mongos1)
+export MONGO_PORT=$(docker port mongos1 27017/tcp | cut -f2 -d":")
 
 # Use "yes" to load the collections
 DOLOAD=yes
