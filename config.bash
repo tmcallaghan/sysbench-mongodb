@@ -11,6 +11,9 @@ export USERNAME=myuser
 # database password to use for USERNAME
 export PASSWORD=mypass
 
+# --authenticationDatabase 
+export AUTHDB=admin
+
 # name of the server to connect to
 export MONGO_SERVER=localhost
 
