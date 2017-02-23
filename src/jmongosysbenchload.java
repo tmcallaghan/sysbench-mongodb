@@ -125,6 +125,15 @@ public class jmongosysbenchload {
 
         DB db = m.getDB(dbName);
 
+        // skip load if already loaded
+        DBObject cmd = new BasicDBObject();
+        cmd.put("collStats", "sbtest1");
+        CommandResult collStats = db.command(cmd);
+        if (collStats.ok()) {
+            logMe("*** ignore load stage because already loaded");
+            System.exit(1);
+        }
+
         // determine server type : mongo or tokumx
         DBObject checkServerCmd = new BasicDBObject();
         CommandResult commandResult = db.command("buildInfo");
