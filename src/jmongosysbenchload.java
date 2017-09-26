@@ -41,6 +41,7 @@ public class jmongosysbenchload {
     public static int serverPort;
     public static String userName;
     public static String passWord;
+    public static String authdb;
 
     public static int allDone = 0;
 
@@ -48,9 +49,9 @@ public class jmongosysbenchload {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 15) {
+        if (args.length != 16) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [authdb]");
             System.exit(1);
         }
 
@@ -69,6 +70,7 @@ public class jmongosysbenchload {
         serverPort = Integer.valueOf(args[12]);
         userName = args[13];
         passWord = args[14];
+        authdb = args[15];
 
         WriteConcern myWC = new WriteConcern();
         if (myWriteConcern.toLowerCase().equals("fsync_safe")) {
@@ -112,16 +114,25 @@ public class jmongosysbenchload {
         // Credential login is optional.
         MongoClient m;
         if (userName.isEmpty() || userName.equalsIgnoreCase("none")) {
-            m = new MongoClient(srvrAdd);
+            m = new MongoClient(srvrAdd, clientOptions);
         } else {
-            MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
-            m = new MongoClient(srvrAdd, Arrays.asList(credential));
+            MongoCredential credential = MongoCredential.createCredential(userName, authdb, passWord.toCharArray());
+            m = new MongoClient(srvrAdd, Arrays.asList(credential), clientOptions);
         }
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
         logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
 
         DB db = m.getDB(dbName);
+
+        // skip load if already loaded
+        DBObject cmd = new BasicDBObject();
+        cmd.put("collStats", "sbtest1");
+        CommandResult collStats = db.command(cmd);
+        if (collStats.ok()) {
+            logMe("*** ignore load stage because already loaded");
+            System.exit(1);
+        }
 
         // determine server type : mongo or tokumx
         DBObject checkServerCmd = new BasicDBObject();

@@ -50,6 +50,7 @@ public class jmongosysbenchexecute {
     public static int serverPort;
     public static String userName;
     public static String passWord;
+    public static String authdb;
 
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -71,12 +72,12 @@ public class jmongosysbenchexecute {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 24) {
+        if (args.length != 25) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
                                    "[log file name] [auto commit Y/N] [runtime (seconds)] [range size] [point selects] "+
                                    "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [inserts] [writeconcern] "+
-                                   "[max tps] [server] [port] [seed] [username] [password]");
+                                   "[max tps] [server] [port] [seed] [username] [password] [authdb]");
             System.exit(1);
         }
         
@@ -104,6 +105,7 @@ public class jmongosysbenchexecute {
         rngSeed = Long.valueOf(args[21]);
         userName = args[22];
         passWord = args[23];
+        authdb = args[24];
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
 
@@ -161,10 +163,10 @@ public class jmongosysbenchexecute {
         // Credential login is optional.
         MongoClient m;
         if (userName.isEmpty() || userName.equalsIgnoreCase("none")) {
-            m = new MongoClient(srvrAdd);
+            m = new MongoClient(srvrAdd, clientOptions);
         } else {
-            MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
-            m = new MongoClient(srvrAdd, Arrays.asList(credential));
+            MongoCredential credential = MongoCredential.createCredential(userName, authdb, passWord.toCharArray());
+            m = new MongoClient(srvrAdd, Arrays.asList(credential), clientOptions);
         }
 
         logMe("mongoOptions | " + m.getMongoOptions().toString());
