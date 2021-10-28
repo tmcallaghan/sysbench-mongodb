@@ -14,6 +14,7 @@ import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientOptions;
+import com.mongodb.MongoClientURI;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 import com.mongodb.WriteConcern;
@@ -41,6 +42,8 @@ public class jmongosysbenchload {
     public static int serverPort;
     public static String userName;
     public static String passWord;
+    public static String trustStore;
+    public static String trustStorePassword;
 
     public static int allDone = 0;
 
@@ -48,9 +51,9 @@ public class jmongosysbenchload {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 15) {
+        if (args.length != 17) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password]");
             System.exit(1);
         }
 
@@ -69,22 +72,24 @@ public class jmongosysbenchload {
         serverPort = Integer.valueOf(args[12]);
         userName = args[13];
         passWord = args[14];
+        trustStore = args[15];
+        trustStorePassword = args[16];
 
         WriteConcern myWC = new WriteConcern();
-        if (myWriteConcern.toLowerCase().equals("fsync_safe")) {
-            myWC = WriteConcern.FSYNC_SAFE;
+        if (myWriteConcern.toLowerCase().equals("acknowledged")) {
+            myWC = WriteConcern.ACKNOWLEDGED;
         }
-        else if ((myWriteConcern.toLowerCase().equals("none"))) {
-            myWC = WriteConcern.NONE;
+        else if ((myWriteConcern.toLowerCase().equals("unacknowledged"))) {
+            myWC = WriteConcern.UNACKNOWLEDGED;
         }
-        else if ((myWriteConcern.toLowerCase().equals("normal"))) {
-            myWC = WriteConcern.NORMAL;
+        else if ((myWriteConcern.toLowerCase().equals("w1"))) {
+            myWC = WriteConcern.W1;
         }
-        else if ((myWriteConcern.toLowerCase().equals("replicas_safe"))) {
-            myWC = WriteConcern.REPLICAS_SAFE;
+        else if ((myWriteConcern.toLowerCase().equals("w2"))) {
+            myWC = WriteConcern.W2;
         }
-        else if ((myWriteConcern.toLowerCase().equals("safe"))) {
-            myWC = WriteConcern.SAFE;
+        else if ((myWriteConcern.toLowerCase().equals("w3"))) {
+            myWC = WriteConcern.W3;
         }
         else {
             logMe("*** ERROR : WRITE CONCERN ISSUE ***");
@@ -106,6 +111,7 @@ public class jmongosysbenchload {
         logMe("  Server:Port = %s:%d",serverName,serverPort);
         logMe("  Username = %s",userName);
 
+		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
 
@@ -117,9 +123,22 @@ public class jmongosysbenchload {
             MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
             m = new MongoClient(srvrAdd, Arrays.asList(credential));
         }
+		*/
 
-        logMe("mongoOptions | " + m.getMongoOptions().toString());
-        logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
+        String template = "mongodb://%s:%s@%s:%s/sample-database?ssl=true&replicaSet=rs0&readpreference=%s";
+        //String readPreference = "secondaryPreferred";
+        String readPreference = "primary";
+        String connectionString = String.format(template, userName, passWord, serverName, serverPort, readPreference);
+        logMe("  connection string = %s",connectionString);
+
+        System.setProperty("javax.net.ssl.trustStore", trustStore);
+        System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
+
+        MongoClient m = new MongoClient(new MongoClientURI(connectionString));
+
+
+        //logMe("mongoOptions | " + m.getMongoOptions().toString());
+        //logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
 
         DB db = m.getDB(dbName);
 
@@ -284,7 +303,7 @@ public class jmongosysbenchload {
 
             logMe("Writer thread %d : creating collection %s secondary index",threadNumber, collectionName);
 
-            coll.ensureIndex(new BasicDBObject("k", 1), idxOptions);
+            coll.createIndex(new BasicDBObject("k", 1), idxOptions);
 
             long numInserts = 0;
             int id = 0;

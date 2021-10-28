@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# simple script to run against running MongoDB/TokuMX server localhost:(default port)
-
 # enable passing different config files
 
 if [ ! $1 ];
@@ -20,6 +18,9 @@ else
    exit 1
 fi
 
+CLASSPATH="mongo-java-driver-3.9.1.jar:mongodb-driver-core-3.9.1.jar:mongodb-driver-legacy-3.9.1.jar:$CLASSPATH"
+TAIL_LINES=21
+
 javac -cp $CLASSPATH:$PWD/src src/jmongosysbenchload.java
 javac -cp $CLASSPATH:$PWD/src src/jmongosysbenchexecute.java
 
@@ -35,10 +36,15 @@ if [[ $DOLOAD = "yes" ]]; then
     rm -f $BENCHMARK_TSV
 
     T="$(date +%s)"
-    java -cp $CLASSPATH:$PWD/src jmongosysbenchload $NUM_COLLECTIONS $DB_NAME $NUM_LOADER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_DOCUMENTS_PER_INSERT $NUM_INSERTS_PER_FEEDBACK $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV $MONGO_COMPRESSION $MONGO_BASEMENT $WRITE_CONCERN $MONGO_SERVER $MONGO_PORT "$USERNAME" "$PASSWORD"
+    java -cp $CLASSPATH:$PWD/src jmongosysbenchload $NUM_COLLECTIONS $DB_NAME $NUM_LOADER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_DOCUMENTS_PER_INSERT $NUM_INSERTS_PER_FEEDBACK $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV $MONGO_COMPRESSION $MONGO_BASEMENT $WRITE_CONCERN $MONGO_SERVER $MONGO_PORT "$USERNAME" "$PASSWORD" "$TRUST_STORE" "$TRUST_STORE_PASSWORD"
     echo "" | tee -a $LOG_NAME
     T="$(($(date +%s)-T))"
     printf "`date` | sysbench loader duration = %02d:%02d:%02d:%02d\n" "$((T/86400))" "$((T/3600%24))" "$((T/60%60))" "$((T%60))" | tee -a $LOG_NAME
+    echo ""
+    echo "************************************************************************"
+    echo "final ${numTailLines} interval(s)"
+    echo "************************************************************************"
+    tail -n $TAIL_LINES $LOG_NAME
 fi
 
 
@@ -53,9 +59,14 @@ if [[ $DOQUERY = "yes" ]]; then
     rm -f $BENCHMARK_TSV
 
     T="$(date +%s)"
-    java -cp $CLASSPATH:$PWD/src jmongosysbenchexecute $NUM_COLLECTIONS $DB_NAME $NUM_WRITER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV $SYSBENCH_AUTO_COMMIT $RUN_TIME_SECONDS $SYSBENCH_RANGE_SIZE $SYSBENCH_POINT_SELECTS $SYSBENCH_SIMPLE_RANGES $SYSBENCH_SUM_RANGES $SYSBENCH_ORDER_RANGES $SYSBENCH_DISTINCT_RANGES $SYSBENCH_INDEX_UPDATES $SYSBENCH_NON_INDEX_UPDATES $SYSBENCH_INSERTS $WRITE_CONCERN $MAX_TPS $MONGO_SERVER $MONGO_PORT $SEED "$USERNAME" "$PASSWORD" | tee -a $LOG_NAME
+    java -cp $CLASSPATH:$PWD/src jmongosysbenchexecute $NUM_COLLECTIONS $DB_NAME $NUM_WRITER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV $SYSBENCH_AUTO_COMMIT $RUN_TIME_SECONDS $SYSBENCH_RANGE_SIZE $SYSBENCH_POINT_SELECTS $SYSBENCH_SIMPLE_RANGES $SYSBENCH_SUM_RANGES $SYSBENCH_ORDER_RANGES $SYSBENCH_DISTINCT_RANGES $SYSBENCH_INDEX_UPDATES $SYSBENCH_NON_INDEX_UPDATES $SYSBENCH_INSERTS $WRITE_CONCERN $MAX_TPS $MONGO_SERVER $MONGO_PORT $SEED "$USERNAME" "$PASSWORD" $MONGO_READ_PREFERENCE "$TRUST_STORE" "$TRUST_STORE_PASSWORD" | tee -a $LOG_NAME
     echo "" | tee -a $LOG_NAME
     T="$(($(date +%s)-T))"
     printf "`date` | sysbench benchmark duration = %02d:%02d:%02d:%02d\n" "$((T/86400))" "$((T/3600%24))" "$((T/60%60))" "$((T%60))" | tee -a $LOG_NAME
+    echo ""
+    echo "************************************************************************"
+    echo "final ${numTailLines} interval(s)"
+    echo "************************************************************************"
+    tail -n $TAIL_LINES $LOG_NAME
 fi
 

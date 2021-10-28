@@ -17,6 +17,7 @@ import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientOptions;
+import com.mongodb.MongoClientURI;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 import com.mongodb.WriteConcern;
@@ -50,6 +51,9 @@ public class jmongosysbenchexecute {
     public static int serverPort;
     public static String userName;
     public static String passWord;
+	public static String readPreference;
+	public static String trustStore;
+	public static String trustStorePassword;
 
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -71,12 +75,12 @@ public class jmongosysbenchexecute {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 24) {
+        if (args.length != 27) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
                                    "[log file name] [auto commit Y/N] [runtime (seconds)] [range size] [point selects] "+
                                    "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [inserts] [writeconcern] "+
-                                   "[max tps] [server] [port] [seed] [username] [password]");
+                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password]");
             System.exit(1);
         }
         
@@ -104,24 +108,27 @@ public class jmongosysbenchexecute {
         rngSeed = Long.valueOf(args[21]);
         userName = args[22];
         passWord = args[23];
+		readPreference = args[24];
+		trustStore = args[25];
+		trustStorePassword = args[26];
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
 
         WriteConcern myWC = new WriteConcern();
-        if (myWriteConcern.toLowerCase().equals("fsync_safe")) {
-            myWC = WriteConcern.FSYNC_SAFE;
+        if (myWriteConcern.toLowerCase().equals("acknowledged")) {
+            myWC = WriteConcern.ACKNOWLEDGED;
         }
-        else if ((myWriteConcern.toLowerCase().equals("none"))) {
-            myWC = WriteConcern.NONE;
+        else if ((myWriteConcern.toLowerCase().equals("unacknowledged"))) {
+            myWC = WriteConcern.UNACKNOWLEDGED;
         }
-        else if ((myWriteConcern.toLowerCase().equals("normal"))) {
-            myWC = WriteConcern.NORMAL;
+        else if ((myWriteConcern.toLowerCase().equals("w1"))) {
+            myWC = WriteConcern.W1;
         }
-        else if ((myWriteConcern.toLowerCase().equals("replicas_safe"))) {
-            myWC = WriteConcern.REPLICAS_SAFE;
+        else if ((myWriteConcern.toLowerCase().equals("w2"))) {
+            myWC = WriteConcern.W2;
         }
-        else if ((myWriteConcern.toLowerCase().equals("safe"))) {
-            myWC = WriteConcern.SAFE;
+        else if ((myWriteConcern.toLowerCase().equals("w3"))) {
+            myWC = WriteConcern.W3;
         }
         else {
             logMe("*** ERROR : WRITE CONCERN ISSUE ***");
@@ -154,7 +161,9 @@ public class jmongosysbenchexecute {
         logMe("  Server:Port = %s:%d",serverName,serverPort);
         logMe("  seed                     = %d",rngSeed);
         logMe("  userName                 = %s",userName);
+        logMe("  read preference          = %s",readPreference);
 
+		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
 
@@ -166,9 +175,20 @@ public class jmongosysbenchexecute {
             MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
             m = new MongoClient(srvrAdd, Arrays.asList(credential));
         }
+		*/
 
-        logMe("mongoOptions | " + m.getMongoOptions().toString());
-        logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
+        String template = "mongodb://%s:%s@%s:%s/sample-database?ssl=true&replicaSet=rs0&readpreference=%s&maxPoolSize=4096";
+        String connectionString = String.format(template, userName, passWord, serverName, serverPort, readPreference);
+        //logMe("  connection string = %s",connectionString);
+
+        System.setProperty("javax.net.ssl.trustStore", trustStore);
+        System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
+
+        //MongoClient m = new MongoClient(new MongoClientURI(connectionString),clientOptions);
+        MongoClient m = new MongoClient(new MongoClientURI(connectionString));
+
+        //logMe("mongoOptions | " + m.getMongoOptions().toString());
+        //logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
 
         DB db = m.getDB(dbName);
 
@@ -285,19 +305,19 @@ public class jmongosysbenchexecute {
                 }
 
                 // if TokuMX, lock onto current connection (do not pool)
-                if (bIsTokuMX && !auto_commit) {
-                    db.requestStart();
-                    db.command("beginTransaction");
-                }
+                //if (bIsTokuMX && !auto_commit) {
+                //    db.requestStart();
+                //    db.command("beginTransaction");
+                //}
 
                 String collectionName = "sbtest" + Integer.toString(rand.nextInt(numCollections)+1);
                 DBCollection coll = db.getCollection(collectionName);
 
                 try {
-                    if (bIsTokuMX && !auto_commit) {
-                        // make sure a connection is available, given that we are not pooling
-                        db.requestEnsureConnection();
-                    }
+                    //if (bIsTokuMX && !auto_commit) {
+                    //    // make sure a connection is available, given that we are not pooling
+                    //    db.requestEnsureConnection();
+                    //}
 
                     for (int i=1; i <= oltpPointSelects; i++) {
                         //for i=1, oltp_point_selects do
@@ -483,12 +503,12 @@ public class jmongosysbenchexecute {
                     numTransactions += 1;
 
                 } finally {
-                    if (bIsTokuMX && !auto_commit) {
-                        // commit the transaction and release current connection in the pool
-                        db.command("commitTransaction");
-                        //--db.command("rollbackTransaction")
-                        db.requestDone();
-                    }
+                    //if (bIsTokuMX && !auto_commit) {
+                    //    // commit the transaction and release current connection in the pool
+                    //    db.command("commitTransaction");
+                    //    //--db.command("rollbackTransaction")
+                    //    db.requestDone();
+                    //}
                 }
             }
 

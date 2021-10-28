@@ -5,4 +5,9 @@
 # Package Files #
 *.jar
 *.war
-*.ear
+*.earA
+
+# Specific Files #
+tmc.config
+clean.bash
+rds-truststore.jks
