@@ -7,18 +7,20 @@ Sysbench for MongoDB and TokuMX
 Requirements
 =====================
 
-* Java 1.6 or 1.7
-* The MongoDB Java driver must exist and be in the CLASSPATH, as in "export CLASSPATH=/home/tcallaghan/java_goodies/mongo-2.13.0.jar:.". If you don't already have the MongoDB Java driver, then execute the following two commands:
-    * wget https://repo1.maven.org/maven2/org/mongodb/mongo-java-driver/2.13.0/mongo-java-driver-2.13.0.jar
-    * export CLASSPATH=$PWD/mongo-java-driver-2.13.0.jar:$CLASSPATH
-* This example assumes that you already have a MongoDB or TokuMX server running on the same machine as the Sysbench client application.
-* You can connect a different server or port by editing the config.bash script.
+* Java 17 (tested working with OpenJDK)
+* MongoDB Java driver jars - specifically version 3.9.1 (for now)
+  * they must be in the working directory (for now)
+  * wget https://oss.sonatype.org/content/repositories/releases/org/mongodb/mongo-java-driver/3.9.1/mongo-java-driver-3.9.1.jar
+  * wget https://oss.sonatype.org/content/repositories/releases/org/mongodb/mongodb-driver-core/3.9.1/mongodb-driver-core-3.9.1.jar
+  * wget https://oss.sonatype.org/content/repositories/releases/org/mongodb/mongodb-driver-legacy/3.9.1/mongodb-driver-legacy-3.9.1.jar
+* Modify config.bash file for credentials, server endpoint, etc.
+* Currently the connection is only via TLS, you'll need to create your key store file. Instructions are available at https://docs.aws.amazon.com/documentdb/latest/developerguide/connect_programmatically.html
 
 
 Running the benchmark
 =====================
 
-In the default configuration the benchmark creates 16 collections, each with 10 million documents. You may want to watch the size of the database relative to your memory size to ensure you are testing just a memory based workload vs a workload that is exceeding memory and utilizing disk as well. All options are configurable in config.bash (or custom config file with the same options)
+In the default configuration the benchmark creates 10 collections, each with 1 million documents. You may want to watch the size of the database relative to your memory size to ensure you are testing just a memory based workload vs a workload that is exceeding memory and utilizing disk as well. All options are configurable in config.bash (or custom config file with the same options)
 
 To run:
 
