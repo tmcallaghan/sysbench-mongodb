@@ -44,6 +44,7 @@ public class jmongosysbenchload {
     public static String passWord;
     public static String trustStore;
     public static String trustStorePassword;
+	public static String useSSL;
 
     public static int allDone = 0;
 
@@ -51,9 +52,9 @@ public class jmongosysbenchload {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 17) {
+        if (args.length != 18) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password] [use ssl]");
             System.exit(1);
         }
 
@@ -74,6 +75,7 @@ public class jmongosysbenchload {
         passWord = args[14];
         trustStore = args[15];
         trustStorePassword = args[16];
+		useSSL = args[17].toLowerCase();
 
         WriteConcern myWC = new WriteConcern();
         if (myWriteConcern.toLowerCase().equals("acknowledged")) {
@@ -110,6 +112,7 @@ public class jmongosysbenchload {
         logMe("  write concern = %s",myWriteConcern);
         logMe("  Server:Port = %s:%d",serverName,serverPort);
         logMe("  Username = %s",userName);
+		logMe("  Use SSL = %s",useSSL);
 
 		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
@@ -125,17 +128,18 @@ public class jmongosysbenchload {
         }
 		*/
 
-        String template = "mongodb://%s:%s@%s:%s/sample-database?ssl=true&replicaSet=rs0&readpreference=%s";
+        String template = "mongodb://%s:%s@%s:%s/sample-database?ssl=%s&replicaSet=rs0&readpreference=%s";
         //String readPreference = "secondaryPreferred";
         String readPreference = "primary";
-        String connectionString = String.format(template, userName, passWord, serverName, serverPort, readPreference);
+        String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
         logMe("  connection string = %s",connectionString);
 
-        System.setProperty("javax.net.ssl.trustStore", trustStore);
-        System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
+        if (useSSL.equals("true")) {
+            System.setProperty("javax.net.ssl.trustStore", trustStore);
+            System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
+		}
 
         MongoClient m = new MongoClient(new MongoClientURI(connectionString));
-
 
         //logMe("mongoOptions | " + m.getMongoOptions().toString());
         //logMe("mongoWriteConcern | " + m.getWriteConcern().toString());

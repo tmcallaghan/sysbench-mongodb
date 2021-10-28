@@ -20,10 +20,15 @@ export MONGO_PORT=27017
 export MONGO_READ_PREFERENCE=secondaryPreferred
 #export MONGO_READ_PREFERENCE=secondary
 
+# use TLS encryption (true/false)
+export USE_TLS=false
+
 # trust store file
+#   leave this alone if not using TLS
 export TRUST_STORE="./rds-truststore.jks"
 
 # trust store password
+#   leave this alone if not using TLS
 export TRUST_STORE_PASSWORD="<replace-with-trust-store-password>"
 
 # Use "yes" to load the collections

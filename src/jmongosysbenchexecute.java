@@ -54,6 +54,7 @@ public class jmongosysbenchexecute {
 	public static String readPreference;
 	public static String trustStore;
 	public static String trustStorePassword;
+	public static String useSSL;
 
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -75,12 +76,12 @@ public class jmongosysbenchexecute {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 27) {
+        if (args.length != 28) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
                                    "[log file name] [auto commit Y/N] [runtime (seconds)] [range size] [point selects] "+
                                    "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [inserts] [writeconcern] "+
-                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password]");
+                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password] [use ssl]");
             System.exit(1);
         }
         
@@ -111,6 +112,7 @@ public class jmongosysbenchexecute {
 		readPreference = args[24];
 		trustStore = args[25];
 		trustStorePassword = args[26];
+		useSSL = args[27].toLowerCase();
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
 
@@ -162,6 +164,7 @@ public class jmongosysbenchexecute {
         logMe("  seed                     = %d",rngSeed);
         logMe("  userName                 = %s",userName);
         logMe("  read preference          = %s",readPreference);
+		logMe("  use SSL                  = %s",useSSL);
 
 		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
@@ -177,12 +180,14 @@ public class jmongosysbenchexecute {
         }
 		*/
 
-        String template = "mongodb://%s:%s@%s:%s/sample-database?ssl=true&replicaSet=rs0&readpreference=%s&maxPoolSize=4096";
-        String connectionString = String.format(template, userName, passWord, serverName, serverPort, readPreference);
+        String template = "mongodb://%s:%s@%s:%s/sample-database?ssl=%s&replicaSet=rs0&readpreference=%s&maxPoolSize=4096";
+        String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
         //logMe("  connection string = %s",connectionString);
 
-        System.setProperty("javax.net.ssl.trustStore", trustStore);
-        System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
+        if (useSSL.equals("true")) {
+            System.setProperty("javax.net.ssl.trustStore", trustStore);
+            System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
+		}
 
         //MongoClient m = new MongoClient(new MongoClientURI(connectionString),clientOptions);
         MongoClient m = new MongoClient(new MongoClientURI(connectionString));
