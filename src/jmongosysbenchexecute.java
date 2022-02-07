@@ -180,7 +180,7 @@ public class jmongosysbenchexecute {
         }
 		*/
 
-        String template = "mongodb://%s:%s@%s:%s/sample-database?ssl=%s&replicaSet=rs0&readpreference=%s&maxPoolSize=4096";
+        String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&replicaSet=rs0&readpreference=%s&maxPoolSize=4096";
         String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
         //logMe("  connection string = %s",connectionString);
 

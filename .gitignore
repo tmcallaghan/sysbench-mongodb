@@ -11,3 +11,4 @@
 tmc.config
 clean.bash
 rds-truststore.jks
+log

@@ -128,7 +128,7 @@ public class jmongosysbenchload {
         }
 		*/
 
-        String template = "mongodb://%s:%s@%s:%s/sample-database?ssl=%s&replicaSet=rs0&readpreference=%s";
+        String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&replicaSet=rs0&readpreference=%s";
         //String readPreference = "secondaryPreferred";
         String readPreference = "primary";
         String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
