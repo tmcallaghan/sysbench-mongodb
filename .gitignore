@@ -8,7 +8,7 @@
 *.earA
 
 # Specific Files #
-tmc.config
+config.tmc
 clean.bash
 rds-truststore.jks
 log
