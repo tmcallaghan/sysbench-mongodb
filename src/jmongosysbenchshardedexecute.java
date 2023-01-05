@@ -5,6 +5,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -23,7 +24,7 @@ import com.mongodb.ServerAddress;
 import com.mongodb.WriteConcern;
 import com.mongodb.WriteResult;
 
-public class jmongosysbenchexecute {
+public class jmongosysbenchshardedexecute {
     public static AtomicLong globalInserts = new AtomicLong(0);
     public static AtomicLong globalDeletes = new AtomicLong(0);
     public static AtomicLong globalUpdates = new AtomicLong(0);
@@ -52,10 +53,12 @@ public class jmongosysbenchexecute {
     public static int serverPort;
     public static String userName;
     public static String passWord;
-	public static String readPreference;
-	public static String trustStore;
-	public static String trustStorePassword;
-	public static String useSSL;
+    public static String readPreference;
+    public static String trustStore;
+    public static String trustStorePassword;
+    public static String useSSL;
+    public static int maxShardKey;
+    public static int docsPerShard;
 
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -73,16 +76,16 @@ public class jmongosysbenchexecute {
 
     public static long rngSeed = 0;
     
-    public jmongosysbenchexecute() {
+    public jmongosysbenchshardedexecute() {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 28) {
+        if (args.length != 30) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
+            logMe("jsysbenchshardedexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
                                    "[log file name] [auto commit Y/N] [runtime (seconds)] [range size] [point selects] "+
                                    "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [inserts] [writeconcern] "+
-                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password] [use ssl]");
+                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password] [use ssl] [max shard key] [num docs per shard]");
             System.exit(1);
         }
         
@@ -114,6 +117,11 @@ public class jmongosysbenchexecute {
 		trustStore = args[25];
 		trustStorePassword = args[26];
 		useSSL = args[27].toLowerCase();
+        maxShardKey = Integer.valueOf(args[28]);
+        docsPerShard = Integer.valueOf(args[29]);
+
+	    // override
+	    numMaxInserts = maxShardKey * docsPerShard;
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
 
@@ -166,6 +174,8 @@ public class jmongosysbenchexecute {
         logMe("  userName                 = %s",userName);
         logMe("  read preference          = %s",readPreference);
 		logMe("  use SSL                  = %s",useSSL);
+        logMe("  max shard key            = %s",maxShardKey);
+        logMe("  num docs per shard       = %s",docsPerShard);
 
 		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
@@ -182,14 +192,15 @@ public class jmongosysbenchexecute {
 		*/
 
         //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&replicaSet=rs0&readpreference=%s&maxPoolSize=4096";
-        String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=4096&serverSelectionTimeoutMS=60000&replicaSet=rs0";
+	    //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=4096&serverSelectionTimeoutMS=30000&replicaSet=rs0";
+	    String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=4096";
         String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
         //logMe("  connection string = %s",connectionString);
 
         //if (useSSL.equals("true")) {
         //    System.setProperty("javax.net.ssl.trustStore", trustStore);
         //    System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
-        //	}
+	    //	}
 
         //MongoClient m = new MongoClient(new MongoClientURI(connectionString),clientOptions);
         MongoClient m = new MongoClient(new MongoClientURI(connectionString));
@@ -231,7 +242,7 @@ public class jmongosysbenchexecute {
             bIsTokuMX = true;
         }
 
-        jmongosysbenchexecute t = new jmongosysbenchexecute();
+        jmongosysbenchshardedexecute t = new jmongosysbenchshardedexecute();
 
         Thread[] tWriterThreads = new Thread[writerThreads];
 
@@ -315,6 +326,9 @@ public class jmongosysbenchexecute {
                 DBCollection coll = db.getCollection(collectionName);
 
                 try {
+		            // pick shard key
+		            int thisShardKey = rand.nextInt(maxShardKey);
+
                     for (int i=1; i <= oltpPointSelects; i++) {
                         //for i=1, oltp_point_selects do
                         //   rs = db_query("SELECT c FROM ".. table_name .." WHERE id=" .. sb_rand(1, oltp_table_size))
@@ -322,9 +336,10 @@ public class jmongosysbenchexecute {
 
                         // db.sbtest8.find({_id: 554312}, {c: 1, _id: 0})
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int startId = rand.nextInt(docsPerShard)+1;
 
-                        BasicDBObject query = new BasicDBObject("_id", startId);
+                        //BasicDBObject query = new BasicDBObject("_id", startId);
+                        BasicDBObject query = new BasicDBObject("shardKey", thisShardKey).append("orderId", startId);
                         BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
 
                         DBObject myDoc = coll.findOne(query, columns);
@@ -341,10 +356,15 @@ public class jmongosysbenchexecute {
 
                         //db.sbtest8.find({_id: {$gte: 5523412, $lte: 5523512}}, {c: 1, _id: 0})
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int startId = rand.nextInt(docsPerShard)+1;
                         int endId = startId + oltpRangeSize - 1;
 
-                        BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
+                        //BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
+			            List<DBObject> queryCriteria = new ArrayList<DBObject>();
+                        queryCriteria.add(new BasicDBObject("shardKey", thisShardKey));
+                        queryCriteria.add(new BasicDBObject("orderId", new BasicDBObject("$gte", startId).append("$lte", endId)));
+
+                        BasicDBObject query = new BasicDBObject("$and", queryCriteria);
                         BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
                         DBCursor cursor = coll.find(query, columns);
                         try {
@@ -367,11 +387,14 @@ public class jmongosysbenchexecute {
 
                         //db.sbtest8.aggregate([ {$match: {_id: {$gt: 5523412, $lt: 5523512}}}, { $group: { _id: null, total: { $sum: "$k"}} } ])
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int startId = rand.nextInt(docsPerShard)+1;
                         int endId = startId + oltpRangeSize - 1;
 
                         // create our pipeline operations, first with the $match
-                        DBObject match = new BasicDBObject("$match", new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId)));
+			            List<DBObject> queryCriteria = new ArrayList<DBObject>();
+                        queryCriteria.add(new BasicDBObject("shardKey", thisShardKey));
+                        queryCriteria.add(new BasicDBObject("orderId", new BasicDBObject("$gte", startId).append("$lte", endId)));
+                        DBObject match = new BasicDBObject("$match", new BasicDBObject("$and", queryCriteria));
 
                         // build the $projection operation
                         DBObject fields = new BasicDBObject("k", 1);
@@ -399,10 +422,14 @@ public class jmongosysbenchexecute {
 
                         //db.sbtest8.find({_id: {$gte: 5523412, $lte: 5523512}}, {c: 1, _id: 0}).sort({c: 1})
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int startId = rand.nextInt(docsPerShard)+1;
                         int endId = startId + oltpRangeSize - 1;
 
-                        BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
+			            List<DBObject> queryCriteria = new ArrayList<DBObject>();
+                        queryCriteria.add(new BasicDBObject("shardKey", thisShardKey));
+                        queryCriteria.add(new BasicDBObject("orderId", new BasicDBObject("$gte", startId).append("$lte", endId)));
+
+                        BasicDBObject query = new BasicDBObject("$and", queryCriteria);
                         BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
                         DBCursor cursor = coll.find(query, columns).sort(new BasicDBObject("c",1));
                         try {
@@ -425,10 +452,14 @@ public class jmongosysbenchexecute {
 
                         //db.sbtest8.distinct("c",{_id: {$gt: 5523412, $lt: 5523512}}).sort()
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int startId = rand.nextInt(docsPerShard)+1;
                         int endId = startId + oltpRangeSize - 1;
 
-                        BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$gte", startId).append("$lte", endId));
+			            List<DBObject> queryCriteria = new ArrayList<DBObject>();
+                        queryCriteria.add(new BasicDBObject("shardKey", thisShardKey));
+                        queryCriteria.add(new BasicDBObject("orderId", new BasicDBObject("$gte", startId).append("$lte", endId)));
+
+                        BasicDBObject query = new BasicDBObject("$and", queryCriteria);
                         BasicDBObject columns = new BasicDBObject("c", 1).append("_id", 0);
                         List lstDistinct = coll.distinct("c", query);
                         //System.out.println(lstDistinct.toString());
@@ -436,6 +467,7 @@ public class jmongosysbenchexecute {
                         globalRangeQueries.incrementAndGet();
                     }
 
+		            //'A {multi:false} update on a sharded collection must either contain an exact match on _id or must target a single shard but this update targeted _id (and have the collection default collation) or must target a single shard (and have the simple collation), but this update targeted multiple shards.'
                     for (int i=1; i <= oltpIndexUpdates; i++) {
                         //for i=1, oltp_index_updates do
                         //   rs = db_query("UPDATE " .. table_name .. " SET k=k+1 WHERE id=" .. sb_rand(1, oltp_table_size))
@@ -443,13 +475,16 @@ public class jmongosysbenchexecute {
 
                         //db.sbtest8.update({_id: 5523412}, {$inc: {k: 1}}, false, false)
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int startId = rand.nextInt(docsPerShard)+1;
 
-                        WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$inc", new BasicDBObject("k",1)), false, false);
+                        BasicDBObject query = new BasicDBObject("shardKey", thisShardKey).append("orderId", startId);
+                        //System.out.println(query.toString());
+
+                        WriteResult wrUpdate = coll.update(query, new BasicDBObject("$inc", new BasicDBObject("k",1)), false, false);
     
                         //System.out.println(wrUpdate.toString());
                     }
-    
+   
                     for (int i=1; i <= oltpNonIndexUpdates; i++) {
                         //for i=1, oltp_non_index_updates do
                         //   c_val = sb_rand_str("###########-###########-###########-###########-###########-###########-###########-###########-###########-###########")
@@ -462,11 +497,13 @@ public class jmongosysbenchexecute {
 
                         //db.sbtest8.update({_id: 5523412}, {$set: {c: "hello there"}}, false, false)
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int startId = rand.nextInt(docsPerShard)+1;
+
+                        BasicDBObject query = new BasicDBObject("shardKey", thisShardKey).append("orderId", startId);
 
                         String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
 
-                        WriteResult wrUpdate = coll.update(new BasicDBObject("_id", startId), new BasicDBObject("$set", new BasicDBObject("c",cVal)), false, false);
+                        WriteResult wrUpdate = coll.update(query, new BasicDBObject("$set", new BasicDBObject("c",cVal)), false, false);
 
                         //System.out.println(wrUpdate.toString());
                     }
@@ -477,17 +514,27 @@ public class jmongosysbenchexecute {
                       
                         //db.sbtest8.remove({_id: 5523412})
 
-                        int startId = rand.nextInt(numMaxInserts)+1;
+                        int startId = rand.nextInt(docsPerShard)+1;
 
-                        WriteResult wrRemove = coll.remove(new BasicDBObject("_id", startId));
+                        BasicDBObject query = new BasicDBObject("shardKey", thisShardKey).append("orderId", startId);
+
+                        DBObject priorDoc = coll.findAndRemove(query);
+
+		                while (priorDoc == null) {
+                            //WriteResult wrRemove = coll.remove(new BasicDBObject("_id", startId));
+                            priorDoc = coll.findAndRemove(query);
+                            //System.out.println(startId);
+			            }
 
                         //c_val = sb_rand_str([[###########-###########-###########-###########-###########-###########-###########-###########-###########-###########]])
                         //pad_val = sb_rand_str([[###########-###########-###########-###########-###########]])
                         //rs = db_query("INSERT INTO " .. table_name ..  " (id, k, c, pad) VALUES " .. string.format("(%d, %d, '%s', '%s')",i, sb_rand(1, oltp_table_size) , c_val, pad_val))
 
                         BasicDBObject doc = new BasicDBObject();
-                        doc.put("_id",startId);
-                        doc.put("k",rand.nextInt(numMaxInserts)+1);
+                        doc.put("_id",priorDoc.get("_id"));
+                        doc.put("shardKey",thisShardKey);
+                        doc.put("orderId",startId);
+                        doc.put("k",rand.nextInt(docsPerShard)+1);
                         String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
                         doc.put("c",cVal);
                         String padVal = sysbenchString(rand, "###########-###########-###########-###########-###########");
@@ -497,12 +544,17 @@ public class jmongosysbenchexecute {
 
                     globalSysbenchTransactions.incrementAndGet();
                     numTransactions += 1;
-                }
-
+                } 
+                
                 catch (Exception e) {
                     globalExceptions.incrementAndGet();
-                //    //logMe("Writer thread %d : EXCEPTION",threadNumber);
-                //    //e.printStackTrace();
+                    //logMe("Writer thread %d : EXCEPTION",threadNumber);
+                    //e.printStackTrace();
+                    try {
+                        Thread.sleep(1000);
+                    } catch (Exception eSleep) {
+                        eSleep.printStackTrace();
+                    }
                 }
                 
                 finally {
@@ -558,7 +610,9 @@ public class jmongosysbenchexecute {
             if (runSeconds > 0)
                 runEndMillis = t0 + (1000 * runSeconds);
 
-            while ((System.currentTimeMillis() < runEndMillis) && (thisInserts < numMaxInserts))
+	        // modified the following, only running time based for now
+            //while ((System.currentTimeMillis() < runEndMillis) && (thisInserts < numMaxInserts))
+            while (System.currentTimeMillis() < runEndMillis)
             {
                 try {
                     Thread.sleep(100);
@@ -588,21 +642,21 @@ public class jmongosysbenchexecute {
                     long thisIntervalInserts = thisInserts - lastInserts;
                     double thisIntervalInsertsPerSecond = thisIntervalInserts/(double)thisIntervalMs*1000.0;
                     double thisInsertsPerSecond = thisInserts/(double)elapsed*1000.0;
-                    
+
                     long thisIntervalExceptions = thisExceptions - lastExceptions;
                     
-                    logMe("%,d seconds : cum tps=%,.2f : int tps=%,.2f : cum ips=%,.2f : int ips=%,.2f : cum excp=%,d : int excpt=%,d : writers=%,d", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisExceptions, thisIntervalExceptions, thisWriterThreads);
+                    logMe("%,d seconds : cum tps=%,.2f : int tps=%,.2f : cum excpt=%,d : int excpt=%,d : writers=%,d", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisExceptions, thisIntervalExceptions, thisWriterThreads);
                     
                     try {
                         if (outputHeader)
                         {
-                            writer.write("elap_secs\tcum_tps\tint_tps\tcum_ips\tint_ips\tcum_excp\tint_excp\n");
+                            writer.write("elap_secs\tcum_tps\tint_tps\tcum_excp\tint_excp\n");
                             outputHeader = false;
                         }
 
                         String statusUpdate = "";
 
-                        statusUpdate = String.format("%d\t%.2f\t%.2f\t%.2f\t%.2f\t%d\t%d\n", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisExceptions, thisIntervalExceptions);
+                        statusUpdate = String.format("%d\t%.2f\t%.2f\t%d\t%d\n", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisExceptions, thisIntervalExceptions);
 
                         writer.write(statusUpdate);
                         writer.flush();

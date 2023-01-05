@@ -1,5 +1,7 @@
 # You will most likely want to change these values
 
+export SHARDED=no
+
 # database in which to run the benchmark
 export DB_NAME=sbtest10by1mm
 

@@ -19,7 +19,7 @@ import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 import com.mongodb.WriteConcern;
 
-public class jmongosysbenchload {
+public class jmongosysbenchshardedload {
     public static AtomicLong globalInserts = new AtomicLong(0);
     public static AtomicLong globalWriterThreads = new AtomicLong(0);
 
@@ -45,16 +45,18 @@ public class jmongosysbenchload {
     public static String trustStore;
     public static String trustStorePassword;
 	public static String useSSL;
+    public static int maxShardKey;
+    public static int docsPerShard;
 
     public static int allDone = 0;
 
-    public jmongosysbenchload() {
+    public jmongosysbenchshardedload() {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 18) {
+        if (args.length != 20) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password] [use ssl]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password] [use ssl] [max shard key] [docs per shard]");
             System.exit(1);
         }
 
@@ -76,6 +78,11 @@ public class jmongosysbenchload {
         trustStore = args[15];
         trustStorePassword = args[16];
 		useSSL = args[17].toLowerCase();
+        maxShardKey = Integer.valueOf(args[18]);
+        docsPerShard = Integer.valueOf(args[19]);
+
+	// override numMaxInserts
+	numMaxInserts = maxShardKey * docsPerShard;
 
         WriteConcern myWC = new WriteConcern();
         if (myWriteConcern.toLowerCase().equals("acknowledged")) {
@@ -113,6 +120,8 @@ public class jmongosysbenchload {
         logMe("  Server:Port = %s:%d",serverName,serverPort);
         logMe("  Username = %s",userName);
 		logMe("  Use SSL = %s",useSSL);
+        logMe("  Maximum Shard Key = %s",maxShardKey);
+        logMe("  Documents Per Shard = %s",docsPerShard);
 
 		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
@@ -129,8 +138,7 @@ public class jmongosysbenchload {
 		*/
 
         //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&replicaSet=rs0&readpreference=%s";
-	//String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000";
-	String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000&replicaSet=rs0&w=3&journal=true";
+	String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000";
         //String readPreference = "secondaryPreferred";
         String readPreference = "primary";
         String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
@@ -182,7 +190,7 @@ public class jmongosysbenchload {
             System.exit(1);
         }
 
-        jmongosysbenchload t = new jmongosysbenchload();
+        jmongosysbenchshardedload t = new jmongosysbenchshardedload();
 
         Thread reporterThread = new Thread(t.new MyReporter());
         reporterThread.start();
@@ -317,26 +325,30 @@ public class jmongosysbenchload {
             try {
                 logMe("Writer thread %d : started to load collection %s",threadNumber, collectionName);
 
-                BasicDBObject[] aDocs = new BasicDBObject[documentsPerInsert];
+                BasicDBObject[] aDocs = new BasicDBObject[docsPerShard];
 
-                int numRounds = numMaxInserts / documentsPerInsert;
+                int numRounds = maxShardKey;
 
                 for (int roundNum = 0; roundNum < numRounds; roundNum++) {
-                    for (int i = 0; i < documentsPerInsert; i++) {
+                    for (int i = 1; i <= docsPerShard; i++) {
                         id++;
                         BasicDBObject doc = new BasicDBObject();
                         doc.put("_id",id);
+                        doc.put("shardKey",roundNum);
+                        doc.put("orderId",i);
                         doc.put("k",rand.nextInt(numMaxInserts)+1);
                         String cVal = sysbenchString(rand, "###########-###########-###########-###########-###########-###########-###########-###########-###########-###########");
                         doc.put("c",cVal);
                         String padVal = sysbenchString(rand, "###########-###########-###########-###########-###########");
                         doc.put("pad",padVal);
-                        aDocs[i]=doc;
+                        aDocs[i-1]=doc;
                     }
 
                     coll.insert(aDocs);
-                    numInserts += documentsPerInsert;
-                    globalInserts.addAndGet(documentsPerInsert);
+                    //numInserts += documentsPerInsert;
+                    //globalInserts.addAndGet(documentsPerInsert);
+                    numInserts += docsPerShard;
+                    globalInserts.addAndGet(docsPerShard);
                 }
 
             } catch (Exception e) {

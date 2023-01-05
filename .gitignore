@@ -9,6 +9,8 @@
 
 # Specific Files #
 config.tmc
+config.tmc.*
 clean.bash
 rds-truststore.jks
 log
+run.tmc.bash
