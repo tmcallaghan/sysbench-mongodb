@@ -59,6 +59,7 @@ public class jmongosysbenchshardedexecute {
     public static String useSSL;
     public static int maxShardKey;
     public static int docsPerShard;
+    public static String replicaSetName;
 
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -80,12 +81,13 @@ public class jmongosysbenchshardedexecute {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 30) {
+        if (args.length != 31) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchshardedexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
                                    "[log file name] [auto commit Y/N] [runtime (seconds)] [range size] [point selects] "+
                                    "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [inserts] [writeconcern] "+
-                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password] [use ssl] [max shard key] [num docs per shard]");
+                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password] [use ssl] [max shard key] [num docs per shard] " +
+                    "[replica set name]");
             System.exit(1);
         }
         
@@ -119,6 +121,7 @@ public class jmongosysbenchshardedexecute {
 		useSSL = args[27].toLowerCase();
         maxShardKey = Integer.valueOf(args[28]);
         docsPerShard = Integer.valueOf(args[29]);
+        replicaSetName = args[30];
 
 	    // override
 	    numMaxInserts = maxShardKey * docsPerShard;
@@ -176,6 +179,7 @@ public class jmongosysbenchshardedexecute {
 		logMe("  use SSL                  = %s",useSSL);
         logMe("  max shard key            = %s",maxShardKey);
         logMe("  num docs per shard       = %s",docsPerShard);
+        logMe("  replica set nam          = %s", replicaSetName);
 
 		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
