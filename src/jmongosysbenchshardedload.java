@@ -47,6 +47,7 @@ public class jmongosysbenchshardedload {
 	public static String useSSL;
     public static int maxShardKey;
     public static int docsPerShard;
+    public static String replicaSetName;
 
     public static int allDone = 0;
 
@@ -80,9 +81,10 @@ public class jmongosysbenchshardedload {
 		useSSL = args[17].toLowerCase();
         maxShardKey = Integer.valueOf(args[18]);
         docsPerShard = Integer.valueOf(args[19]);
+        replicaSetName = args[20];
 
-	// override numMaxInserts
-	numMaxInserts = maxShardKey * docsPerShard;
+        // override numMaxInserts
+        numMaxInserts = maxShardKey * docsPerShard;
 
         WriteConcern myWC = new WriteConcern();
         if (myWriteConcern.toLowerCase().equals("acknowledged")) {
@@ -122,6 +124,7 @@ public class jmongosysbenchshardedload {
 		logMe("  Use SSL = %s",useSSL);
         logMe("  Maximum Shard Key = %s",maxShardKey);
         logMe("  Documents Per Shard = %s",docsPerShard);
+        logMe("  Replica set name = %s", replicaSetName);
 
 		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();

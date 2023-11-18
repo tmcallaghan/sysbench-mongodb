@@ -59,6 +59,7 @@ public class jmongosysbenchshardedexecute {
     public static String useSSL;
     public static int maxShardKey;
     public static int docsPerShard;
+    public static String replicaSetName;
 
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -119,6 +120,7 @@ public class jmongosysbenchshardedexecute {
 		useSSL = args[27].toLowerCase();
         maxShardKey = Integer.valueOf(args[28]);
         docsPerShard = Integer.valueOf(args[29]);
+        replicaSetName = args[30];
 
 	    // override
 	    numMaxInserts = maxShardKey * docsPerShard;
@@ -176,6 +178,7 @@ public class jmongosysbenchshardedexecute {
 		logMe("  use SSL                  = %s",useSSL);
         logMe("  max shard key            = %s",maxShardKey);
         logMe("  num docs per shard       = %s",docsPerShard);
+        logMe("  replica set nam          = %s", replicaSetName);
 
 		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();

@@ -56,6 +56,7 @@ public class jmongosysbenchexecute {
 	public static String trustStore;
 	public static String trustStorePassword;
 	public static String useSSL;
+    public static String replicaSetName;
 
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -114,6 +115,7 @@ public class jmongosysbenchexecute {
 		trustStore = args[25];
 		trustStorePassword = args[26];
 		useSSL = args[27].toLowerCase();
+        replicaSetName = args[28];
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
 
@@ -166,6 +168,7 @@ public class jmongosysbenchexecute {
         logMe("  userName                 = %s",userName);
         logMe("  read preference          = %s",readPreference);
 		logMe("  use SSL                  = %s",useSSL);
+		logMe("  replicaSetName           = %s",replicaSetName);
 
 		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
@@ -182,8 +185,8 @@ public class jmongosysbenchexecute {
 		*/
 
         //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&replicaSet=rs0&readpreference=%s&maxPoolSize=4096";
-        String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=4096&serverSelectionTimeoutMS=60000&replicaSet=rs0";
-        String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
+        String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=4096&serverSelectionTimeoutMS=60000&replicaSet=%s";
+        String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference, replicaSetName);
         //logMe("  connection string = %s",connectionString);
 
         //if (useSSL.equals("true")) {

@@ -46,6 +46,8 @@ public class jmongosysbenchload {
     public static String trustStorePassword;
 	public static String useSSL;
 
+    public static String replicaSetName;
+
     public static int allDone = 0;
 
     public jmongosysbenchload() {
@@ -76,6 +78,7 @@ public class jmongosysbenchload {
         trustStore = args[15];
         trustStorePassword = args[16];
 		useSSL = args[17].toLowerCase();
+        replicaSetName = args[18];
 
         WriteConcern myWC = new WriteConcern();
         if (myWriteConcern.toLowerCase().equals("acknowledged")) {
@@ -113,6 +116,7 @@ public class jmongosysbenchload {
         logMe("  Server:Port = %s:%d",serverName,serverPort);
         logMe("  Username = %s",userName);
 		logMe("  Use SSL = %s",useSSL);
+		logMe("  Replica set name = %s", replicaSetName);
 
 		/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
@@ -129,11 +133,11 @@ public class jmongosysbenchload {
 		*/
 
         //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&replicaSet=rs0&readpreference=%s";
-	//String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000";
-	String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000&replicaSet=rs0&w=3&journal=true";
+	    //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000";
+	    String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000&replicaSet=%s&w=3&journal=true";
         //String readPreference = "secondaryPreferred";
         String readPreference = "primary";
-        String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
+        String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference, replicaSetName);
         logMe("  connection string = %s",connectionString);
 
         //if (useSSL.equals("true")) {

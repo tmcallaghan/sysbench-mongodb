@@ -149,3 +149,6 @@ export MONGO_BASEMENT=65536
 #   valid values : N or Y
 export SYSBENCH_AUTO_COMMIT=Y
 
+# customize replica setname
+export MONGODB_REPLICASETNAME=adt
+
