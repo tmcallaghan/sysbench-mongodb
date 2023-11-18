@@ -14,3 +14,6 @@ clean.bash
 rds-truststore.jks
 log
 run.tmc.bash
+
+.idea
+

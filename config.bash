@@ -1,5 +1,8 @@
 # You will most likely want to change these values
 
+# customize replica setname
+export MONGODB_REPLICASETNAME=adt
+
 export SHARDED=no
 
 # database in which to run the benchmark
@@ -148,7 +151,3 @@ export MONGO_BASEMENT=65536
 # set to N to use begin/commit/ensure for TokuMX
 #   valid values : N or Y
 export SYSBENCH_AUTO_COMMIT=Y
-
-# customize replica setname
-export MONGODB_REPLICASETNAME=adt
-
