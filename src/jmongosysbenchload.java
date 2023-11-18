@@ -54,9 +54,9 @@ public class jmongosysbenchload {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 18) {
+        if (args.length != 19) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password] [use ssl]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password] [use ssl] [replica set name]");
             System.exit(1);
         }
 

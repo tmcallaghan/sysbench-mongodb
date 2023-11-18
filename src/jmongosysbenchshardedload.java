@@ -55,9 +55,9 @@ public class jmongosysbenchshardedload {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 20) {
+        if (args.length != 21) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password] [use ssl] [max shard key] [docs per shard]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password] [use ssl] [max shard key] [docs per shard] [replica set name]");
             System.exit(1);
         }
 

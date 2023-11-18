@@ -78,12 +78,12 @@ public class jmongosysbenchexecute {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 28) {
+        if (args.length != 29) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
                                    "[log file name] [auto commit Y/N] [runtime (seconds)] [range size] [point selects] "+
                                    "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [inserts] [writeconcern] "+
-                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password] [use ssl]");
+                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password] [use ssl] [replica set name]");
             System.exit(1);
         }
         
