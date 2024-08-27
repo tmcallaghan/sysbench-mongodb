@@ -1,7 +1,7 @@
 sysbench-mongodb
 ================
 
-Sysbench for MongoDB and TokuMX
+Sysbench benchmark for MongoDB compatible databases
 
 
 Requirements
