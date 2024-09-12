@@ -33,18 +33,10 @@ public class jmongosysbenchload {
     public static int documentsPerInsert;
     public static long insertsPerFeedback;
     public static long secondsPerFeedback;
-    public static String compressionType;
-    public static int basementSize;
     public static String logFileName;
-    public static String indexTechnology;
-    public static String myWriteConcern;
-    public static String serverName;
-    public static int serverPort;
-    public static String userName;
-    public static String passWord;
     public static String trustStore;
     public static String trustStorePassword;
-	public static String useSSL;
+    public static String connectionString;
 
     public static int allDone = 0;
 
@@ -52,9 +44,9 @@ public class jmongosysbenchload {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 18) {
+        if (args.length != 11) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
-            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [compression type] [basement node size (bytes)]  [writeconcern] [server] [port] [username] [password] [trust store file] [trust store password] [use ssl]");
+            logMe("jsysbenchload [number of collections] [database name] [number of writer threads] [documents per collection] [documents per insert] [inserts feedback] [seconds feedback] [log file name] [trust store file] [trust store password] [connection string]");
             System.exit(1);
         }
 
@@ -66,38 +58,9 @@ public class jmongosysbenchload {
         insertsPerFeedback = Long.valueOf(args[5]);
         secondsPerFeedback = Long.valueOf(args[6]);
         logFileName = args[7];
-        compressionType = args[8];
-        basementSize = Integer.valueOf(args[9]);
-        myWriteConcern = args[10];
-        serverName = args[11];
-        serverPort = Integer.valueOf(args[12]);
-        userName = args[13];
-        passWord = args[14];
-        trustStore = args[15];
-        trustStorePassword = args[16];
-		useSSL = args[17].toLowerCase();
-
-        WriteConcern myWC = new WriteConcern();
-        if (myWriteConcern.toLowerCase().equals("acknowledged")) {
-            myWC = WriteConcern.ACKNOWLEDGED;
-        }
-        else if ((myWriteConcern.toLowerCase().equals("unacknowledged"))) {
-            myWC = WriteConcern.UNACKNOWLEDGED;
-        }
-        else if ((myWriteConcern.toLowerCase().equals("w1"))) {
-            myWC = WriteConcern.W1;
-        }
-        else if ((myWriteConcern.toLowerCase().equals("w2"))) {
-            myWC = WriteConcern.W2;
-        }
-        else if ((myWriteConcern.toLowerCase().equals("w3"))) {
-            myWC = WriteConcern.W3;
-        }
-        else {
-            logMe("*** ERROR : WRITE CONCERN ISSUE ***");
-            logMe("  write concern %s is not supported",myWriteConcern);
-            System.exit(1);
-        }
+        trustStore = args[8];
+        trustStorePassword = args[9];
+        connectionString = args[10];
 
         logMe("Application Parameters");
         logMe("--------------------------------------------------");
@@ -109,12 +72,8 @@ public class jmongosysbenchload {
         logMe("  Feedback every %,d seconds(s)",secondsPerFeedback);
         logMe("  Feedback every %,d inserts(s)",insertsPerFeedback);
         logMe("  logging to file %s",logFileName);
-        logMe("  write concern = %s",myWriteConcern);
-        logMe("  Server:Port = %s:%d",serverName,serverPort);
-        logMe("  Username = %s",userName);
-		logMe("  Use SSL = %s",useSSL);
 
-		/*
+	/*
         MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
         ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
 
@@ -130,10 +89,11 @@ public class jmongosysbenchload {
 
         //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&replicaSet=rs0&readpreference=%s";
 	//String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000";
-	String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000&replicaSet=rs0&w=3&journal=true";
+        //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000&replicaSet=rs0&w=3&journal=true";
+	//String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000&replicaSet=rs0&w=1&journal=true";
         //String readPreference = "secondaryPreferred";
-        String readPreference = "primary";
-        String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
+        //String readPreference = "primary";
+        //String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
         logMe("  connection string = %s",connectionString);
 
         //if (useSSL.equals("true")) {
@@ -149,24 +109,19 @@ public class jmongosysbenchload {
         DB db = m.getDB(dbName);
 
         // determine server type : mongo or tokumx
-        DBObject checkServerCmd = new BasicDBObject();
-        CommandResult commandResult = db.command("buildInfo");
+        //DBObject checkServerCmd = new BasicDBObject();
+        //CommandResult commandResult = db.command("buildInfo");
 
         // check if tokumxVersion exists, otherwise assume mongo
-        if (commandResult.toString().contains("tokumxVersion")) {
-            indexTechnology = "tokumx";
-        }
-        else
-        {
-            indexTechnology = "mongo";
-        }
+        //if (commandResult.toString().contains("tokumxVersion")) {
+        //    indexTechnology = "tokumx";
+        //}
+        //else
+        //{
+        //    indexTechnology = "mongo";
+        //}
 
-        logMe("  index technology = %s",indexTechnology);
-
-        if (indexTechnology.toLowerCase().equals("tokumx")) {
-            logMe("  + compression type = %s",compressionType);
-            logMe("  + basement node size (bytes) = %d",basementSize);
-        }
+        //logMe("  index technology = %s",indexTechnology);
 
         logMe("--------------------------------------------------");
 
@@ -174,12 +129,6 @@ public class jmongosysbenchload {
             writer = new BufferedWriter(new FileWriter(new File(logFileName)));
         } catch (IOException e) {
             e.printStackTrace();
-        }
-
-        if ((!indexTechnology.toLowerCase().equals("tokumx")) && (!indexTechnology.toLowerCase().equals("mongo"))) {
-            // unknown index technology, abort
-            logMe(" *** Unknown Indexing Technology %s, shutting down",indexTechnology);
-            System.exit(1);
         }
 
         jmongosysbenchload t = new jmongosysbenchload();
@@ -230,12 +179,6 @@ public class jmongosysbenchload {
             }
         }
 
-        // wait for writer threads to terminate
-        //for (int i=0; i<writerThreads; i++) {
-        //    if (tWriterThreads[i].isAlive())
-        //        tWriterThreads[i].join();
-        //}
-
         // all the writers are finished
         allDone = 1;
 
@@ -249,8 +192,6 @@ public class jmongosysbenchload {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        // m.dropDatabase("mydb");
 
         m.close();
 
@@ -278,6 +219,7 @@ public class jmongosysbenchload {
         public void run() {
             String collectionName = "sbtest" + Integer.toString(collectionNumber);
 
+	    /*
             if (indexTechnology.toLowerCase().equals("tokumx")) {
                 DBObject cmd = new BasicDBObject();
                 cmd.put("create", collectionName);
@@ -294,6 +236,7 @@ public class jmongosysbenchload {
                 logMe(" *** Unknown Indexing Technology %s, shutting down",indexTechnology);
                 System.exit(1);
             }
+	    */
 
             logMe("Writer thread %d : creating collection %s",threadNumber, collectionName);
 
@@ -302,10 +245,10 @@ public class jmongosysbenchload {
             BasicDBObject idxOptions = new BasicDBObject();
             idxOptions.put("background",false);
 
-            if (indexTechnology.toLowerCase().equals("tokumx")) {
-                idxOptions.put("compression",compressionType);
-                idxOptions.put("readPageSize",basementSize);
-            }
+            //if (indexTechnology.toLowerCase().equals("tokumx")) {
+            //    idxOptions.put("compression",compressionType);
+            //    idxOptions.put("readPageSize",basementSize);
+            //}
 
             logMe("Writer thread %d : creating collection %s secondary index",threadNumber, collectionName);
 
@@ -403,9 +346,9 @@ public class jmongosysbenchload {
 
                     if (secondsPerFeedback > 0)
                     {
-                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f", thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
+                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f : inserts=%,d", thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisInserts);
                     } else {
-                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f", intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
+                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f : inserts=%,d", intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisInserts);
                     }
 
                     try {
