@@ -32,6 +32,8 @@ public class jmongosysbenchexecute {
     public static AtomicLong globalSysbenchTransactions = new AtomicLong(0);
     public static AtomicLong globalWriterThreads = new AtomicLong(0);
     public static AtomicLong globalExceptions = new AtomicLong(0);
+    public static AtomicLong globalNewBatchQty = new AtomicLong(0);
+    public static AtomicLong globalNewBatchLatency = new AtomicLong(0);
 
     public static Writer writer = null;
     public static boolean outputHeader = true;
@@ -42,20 +44,13 @@ public class jmongosysbenchexecute {
     public static Integer numMaxInserts;
     public static long secondsPerFeedback;
     public static String logFileName;
-    public static String indexTechnology;
-    public static String autoCommit;
+    //public static String autoCommit;
     public static int runSeconds;
-    public static String myWriteConcern;
     public static Integer maxTPS;
     public static Integer maxThreadTPS;
-    public static String serverName;
-    public static int serverPort;
-    public static String userName;
-    public static String passWord;
-	public static String readPreference;
-	public static String trustStore;
-	public static String trustStorePassword;
-	public static String useSSL;
+    public static String trustStore;
+    public static String trustStorePassword;
+    public static String connectionString;
 
     public static int oltpRangeSize;
     public static int oltpPointSelects;
@@ -67,22 +62,19 @@ public class jmongosysbenchexecute {
     public static int oltpNonIndexUpdates;
     public static int oltpInserts;
 
-    public static boolean bIsTokuMX = false;
-
     public static int allDone = 0;
-
     public static long rngSeed = 0;
     
     public jmongosysbenchexecute() {
     }
 
     public static void main (String[] args) throws Exception {
-        if (args.length != 28) {
+        if (args.length != 21) {
             logMe("*** ERROR : CONFIGURATION ISSUE ***");
             logMe("jsysbenchexecute [number of collections] [database name] [number of writer threads] [documents per collection] [seconds feedback] "+
-                                   "[log file name] [auto commit Y/N] [runtime (seconds)] [range size] [point selects] "+
-                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [inserts] [writeconcern] "+
-                                   "[max tps] [server] [port] [seed] [username] [password] [read preference] [trust store] [trust store password] [use ssl]");
+                                   "[log file name] [runtime (seconds)] [range size] [point selects] "+
+                                   "[simple ranges] [sum ranges] [order ranges] [distinct ranges] [index updates] [non index updates] [inserts] "+
+                                   "[max tps] [seed] [trust store] [trust store password] [connection string]");
             System.exit(1);
         }
         
@@ -92,52 +84,23 @@ public class jmongosysbenchexecute {
         numMaxInserts = Integer.valueOf(args[3]);
         secondsPerFeedback = Long.valueOf(args[4]);
         logFileName = args[5];
-        autoCommit = args[6];
-        runSeconds = Integer.valueOf(args[7]);
-        oltpRangeSize = Integer.valueOf(args[8]);
-        oltpPointSelects = Integer.valueOf(args[9]);
-        oltpSimpleRanges = Integer.valueOf(args[10]);
-        oltpSumRanges = Integer.valueOf(args[11]);
-        oltpOrderRanges = Integer.valueOf(args[12]);
-        oltpDistinctRanges = Integer.valueOf(args[13]);
-        oltpIndexUpdates = Integer.valueOf(args[14]);
-        oltpNonIndexUpdates = Integer.valueOf(args[15]);
-        oltpInserts = Integer.valueOf(args[16]);
-        myWriteConcern = args[17];
-        maxTPS = Integer.valueOf(args[18]);
-        serverName = args[19];
-        serverPort = Integer.valueOf(args[20]);
-        rngSeed = Long.valueOf(args[21]);
-        userName = args[22];
-        passWord = args[23];
-		readPreference = args[24];
-		trustStore = args[25];
-		trustStorePassword = args[26];
-		useSSL = args[27].toLowerCase();
+        runSeconds = Integer.valueOf(args[6]);
+        oltpRangeSize = Integer.valueOf(args[7]);
+        oltpPointSelects = Integer.valueOf(args[8]);
+        oltpSimpleRanges = Integer.valueOf(args[9]);
+        oltpSumRanges = Integer.valueOf(args[10]);
+        oltpOrderRanges = Integer.valueOf(args[11]);
+        oltpDistinctRanges = Integer.valueOf(args[12]);
+        oltpIndexUpdates = Integer.valueOf(args[13]);
+        oltpNonIndexUpdates = Integer.valueOf(args[14]);
+        oltpInserts = Integer.valueOf(args[15]);
+        maxTPS = Integer.valueOf(args[16]);
+        rngSeed = Long.valueOf(args[17]);
+	trustStore = args[18];
+	trustStorePassword = args[19];
+	connectionString = args[20];
 
         maxThreadTPS = (maxTPS / writerThreads) + 1;
-
-        WriteConcern myWC = new WriteConcern();
-        if (myWriteConcern.toLowerCase().equals("acknowledged")) {
-            myWC = WriteConcern.ACKNOWLEDGED;
-        }
-        else if ((myWriteConcern.toLowerCase().equals("unacknowledged"))) {
-            myWC = WriteConcern.UNACKNOWLEDGED;
-        }
-        else if ((myWriteConcern.toLowerCase().equals("w1"))) {
-            myWC = WriteConcern.W1;
-        }
-        else if ((myWriteConcern.toLowerCase().equals("w2"))) {
-            myWC = WriteConcern.W2;
-        }
-        else if ((myWriteConcern.toLowerCase().equals("w3"))) {
-            myWC = WriteConcern.W3;
-        }
-        else {
-            logMe("*** ERROR : WRITE CONCERN ISSUE ***");
-            logMe("  write concern %s is not supported",myWriteConcern);
-            System.exit(1);
-        }
 
         logMe("Application Parameters");
         logMe("-------------------------------------------------------------------------------------------------");
@@ -147,7 +110,6 @@ public class jmongosysbenchexecute {
         logMe("  documents per collection = %,d",numMaxInserts);
         logMe("  feedback seconds         = %,d",secondsPerFeedback);
         logMe("  log file                 = %s",logFileName);
-        logMe("  auto commit              = %s",autoCommit);
         logMe("  run seconds              = %d",runSeconds);
         logMe("  oltp range size          = %d",oltpRangeSize);
         logMe("  oltp point selects       = %d",oltpPointSelects);
@@ -158,47 +120,16 @@ public class jmongosysbenchexecute {
         logMe("  oltp index updates       = %d",oltpIndexUpdates);
         logMe("  oltp non index updates   = %d",oltpNonIndexUpdates);
         logMe("  oltp inserts             = %d",oltpInserts);
-        logMe("  write concern            = %s",myWriteConcern);
         logMe("  maximum tps (global)     = %d",maxTPS);
         logMe("  maximum tps (per thread) = %d",maxThreadTPS);
-        logMe("  Server:Port = %s:%d",serverName,serverPort);
         logMe("  seed                     = %d",rngSeed);
-        logMe("  userName                 = %s",userName);
-        logMe("  read preference          = %s",readPreference);
-		logMe("  use SSL                  = %s",useSSL);
+        logMe("-------------------------------------------------------------------------------------------------");
 
-		/*
-        MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
-        ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-
-        // Credential login is optional.
-        MongoClient m;
-        if (userName.isEmpty() || userName.equalsIgnoreCase("none")) {
-            m = new MongoClient(srvrAdd);
-        } else {
-            MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
-            m = new MongoClient(srvrAdd, Arrays.asList(credential));
-        }
-		*/
-
-        //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&replicaSet=rs0&readpreference=%s&maxPoolSize=4096";
-        String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=4096&serverSelectionTimeoutMS=60000&replicaSet=rs0";
-        String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
-        //logMe("  connection string = %s",connectionString);
-
-        //if (useSSL.equals("true")) {
-        //    System.setProperty("javax.net.ssl.trustStore", trustStore);
-        //    System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
-        //	}
-
-        //MongoClient m = new MongoClient(new MongoClientURI(connectionString),clientOptions);
         MongoClient m = new MongoClient(new MongoClientURI(connectionString));
-
-        //logMe("mongoOptions | " + m.getMongoOptions().toString());
-        //logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
 
         DB db = m.getDB(dbName);
 
+	/*
         // determine server type : mongo or tokumx
         DBObject checkServerCmd = new BasicDBObject();
         CommandResult commandResult = db.command("buildInfo");
@@ -211,24 +142,12 @@ public class jmongosysbenchexecute {
         {
             indexTechnology = "mongo";
         }
-
-        logMe("  index technology         = %s",indexTechnology);
-        logMe("-------------------------------------------------------------------------------------------------");
+	*/
 
         try {
             writer = new BufferedWriter(new FileWriter(new File(logFileName)));
         } catch (IOException e) {
             e.printStackTrace();
-        }
-
-        if ((!indexTechnology.toLowerCase().equals("tokumx")) && (!indexTechnology.toLowerCase().equals("mongo"))) {
-            // unknown index technology, abort
-            logMe(" *** Unknown Indexing Technology %s, shutting down",indexTechnology);
-            System.exit(1);
-        }
-
-        if (indexTechnology.toLowerCase().equals("tokumx")) {
-            bIsTokuMX = true;
         }
 
         jmongosysbenchexecute t = new jmongosysbenchexecute();
@@ -295,8 +214,6 @@ public class jmongosysbenchexecute {
             long numLastTransactions = 0;
             long nextMs = System.currentTimeMillis() + 1000;
 
-            boolean auto_commit = !autoCommit.toLowerCase().equals("n");
-
             while (allDone == 0) {
                 if ((numTransactions - numLastTransactions) >= maxThreadTPS) {
                     // pause until a second has passed
@@ -313,6 +230,8 @@ public class jmongosysbenchexecute {
 
                 String collectionName = "sbtest" + Integer.toString(rand.nextInt(numCollections)+1);
                 DBCollection coll = db.getCollection(collectionName);
+
+		long timeStart = System.currentTimeMillis();
 
                 try {
                     for (int i=1; i <= oltpPointSelects; i++) {
@@ -497,6 +416,10 @@ public class jmongosysbenchexecute {
 
                     globalSysbenchTransactions.incrementAndGet();
                     numTransactions += 1;
+
+		    long timeEnd = System.currentTimeMillis();
+                    globalNewBatchQty.addAndGet(1);
+                    globalNewBatchLatency.addAndGet(timeEnd-timeStart);
                 }
 
                 catch (Exception e) {
@@ -590,19 +513,28 @@ public class jmongosysbenchexecute {
                     double thisInsertsPerSecond = thisInserts/(double)elapsed*1000.0;
                     
                     long thisIntervalExceptions = thisExceptions - lastExceptions;
-                    
-                    logMe("%,d seconds : cum tps=%,.2f : int tps=%,.2f : cum ips=%,.2f : int ips=%,.2f : cum excp=%,d : int excpt=%,d : writers=%,d", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisExceptions, thisIntervalExceptions, thisWriterThreads);
+
+                    long thisBatchQty = globalNewBatchQty.getAndSet(0);
+                    long thisBatchLatency = globalNewBatchLatency.getAndSet(0);
+                    double thisIntervalLatency = 0.0;
+
+                    if (thisBatchQty > 0)
+                    {
+                        thisIntervalLatency = (double)thisBatchLatency / (double)thisBatchQty;
+                    }
+
+                    logMe("%,d seconds : cum tps=%,.2f : int tps=%,.2f : cum ips=%,.2f : int ips=%,.2f : cum excp=%,d : int excpt=%,d : writers=%,d : int lat=%,.2f", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisExceptions, thisIntervalExceptions, thisWriterThreads, thisIntervalLatency);
                     
                     try {
                         if (outputHeader)
                         {
-                            writer.write("elap_secs\tcum_tps\tint_tps\tcum_ips\tint_ips\tcum_excp\tint_excp\n");
+                            writer.write("elap_secs\tcum_tps\tint_tps\tcum_ips\tint_ips\tcum_excp\tint_excp\tint_lat\n");
                             outputHeader = false;
                         }
 
                         String statusUpdate = "";
 
-                        statusUpdate = String.format("%d\t%.2f\t%.2f\t%.2f\t%.2f\t%d\t%d\n", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisExceptions, thisIntervalExceptions);
+                        statusUpdate = String.format("%d\t%.2f\t%.2f\t%.2f\t%.2f\t%d\t%d\t%.2f\n", elapsed / 1000l, thisSysbenchTransactionsPerSecond, thisIntervalSysbenchTransactionsPerSecond, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisExceptions, thisIntervalExceptions, thisIntervalLatency);
 
                         writer.write(statusUpdate);
                         writer.flush();

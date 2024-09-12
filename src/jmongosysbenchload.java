@@ -318,8 +318,8 @@ public class jmongosysbenchload {
                     nextFeedbackMillis = t0 + (1000 * secondsPerFeedback * (intervalNumber + 1));
                     nextFeedbackInserts = (intervalNumber + 1) * insertsPerFeedback;
 
-		    long thisBatchQty = globalNewBatchQty.get();
-		    long thisBatchLatency = globalNewBatchLatency.get();
+		    long thisBatchQty = globalNewBatchQty.getAndSet(0);
+		    long thisBatchLatency = globalNewBatchLatency.getAndSet(0);
 		    double thisIntervalLatency = 0.0;
 
 		    if (thisBatchQty > 0)
