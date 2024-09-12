@@ -21,6 +21,8 @@ import com.mongodb.WriteConcern;
 
 public class jmongosysbenchload {
     public static AtomicLong globalInserts = new AtomicLong(0);
+    public static AtomicLong globalNewBatchQty = new AtomicLong(0);
+    public static AtomicLong globalNewBatchLatency = new AtomicLong(0);
     public static AtomicLong globalWriterThreads = new AtomicLong(0);
 
     public static Writer writer = null;
@@ -252,9 +254,13 @@ public class jmongosysbenchload {
                         aDocs[i]=doc;
                     }
 
+		    long timeStart = System.currentTimeMillis();
                     coll.insert(aDocs);
+		    long timeEnd = System.currentTimeMillis();
                     numInserts += documentsPerInsert;
                     globalInserts.addAndGet(documentsPerInsert);
+		    globalNewBatchQty.addAndGet(1);
+		    globalNewBatchLatency.addAndGet(timeEnd-timeStart);
                 }
 
             } catch (Exception e) {
@@ -312,6 +318,15 @@ public class jmongosysbenchload {
                     nextFeedbackMillis = t0 + (1000 * secondsPerFeedback * (intervalNumber + 1));
                     nextFeedbackInserts = (intervalNumber + 1) * insertsPerFeedback;
 
+		    long thisBatchQty = globalNewBatchQty.get();
+		    long thisBatchLatency = globalNewBatchLatency.get();
+		    double thisIntervalLatency = 0.0;
+
+		    if (thisBatchQty > 0)
+		    {
+                        thisIntervalLatency = (double)thisBatchLatency / (double)thisBatchQty;
+		    }	
+
                     long elapsed = now - t0;
                     long thisIntervalMs = now - lastMs;
 
@@ -321,15 +336,15 @@ public class jmongosysbenchload {
 
                     if (secondsPerFeedback > 0)
                     {
-                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f : inserts=%,d", thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisInserts);
+                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f : int lat=%,.2f", thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisIntervalLatency);
                     } else {
-                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f : inserts=%,d", intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisInserts);
+                        logMe("%,d inserts : %,d seconds : cum ips=%,.2f : int ips=%,.2f : int lat=%,.2f", intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisIntervalLatency);
                     }
 
                     try {
                         if (outputHeader)
                         {
-                            writer.write("tot_inserts\telap_secs\tcum_ips\tint_ips\n");
+                            writer.write("tot_inserts\telap_secs\tcum_ips\tint_ips\tint_lat\n");
                             outputHeader = false;
                         }
 
@@ -337,9 +352,9 @@ public class jmongosysbenchload {
 
                         if (secondsPerFeedback > 0)
                         {
-                            statusUpdate = String.format("%d\t%d\t%.2f\t%.2f\n",thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
+                            statusUpdate = String.format("%d\t%d\t%.2f\t%.2f\n",thisInserts, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisIntervalLatency);
                         } else {
-                            statusUpdate = String.format("%d\t%d\t%.2f\t%.2f\n",intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond);
+                            statusUpdate = String.format("%d\t%d\t%.2f\t%.2f\n",intervalNumber * insertsPerFeedback, elapsed / 1000l, thisInsertsPerSecond, thisIntervalInsertsPerSecond, thisIntervalLatency);
                         }
                         writer.write(statusUpdate);
                         writer.flush();

@@ -37,7 +37,7 @@ javac -cp $CLASSPATH:$PWD/src src/jmongosysbenchshardedexecute.java
 
 if [[ $DOLOAD = "yes" ]]; then
     echo Do load at $( date )
-    export LOG_NAME=mongoSysbenchLoad-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_LOADER_THREADS}.txt
+    export LOG_NAME=mongoSysbenchLoad-${DOCDB_DBNAME}-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_LOADER_THREADS}.txt
     export BENCHMARK_TSV=${LOG_NAME}.tsv
  
     rm -f $LOG_NAME
@@ -47,10 +47,10 @@ if [[ $DOLOAD = "yes" ]]; then
 
     if [[ $SHARDED = "no" ]]; then
         echo "executing standard sysbench load (not sharded)" | tee -a $LOG_NAME
-        java -cp $CLASSPATH:$PWD/src jmongosysbenchload $NUM_COLLECTIONS $DB_NAME $NUM_LOADER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_DOCUMENTS_PER_INSERT $NUM_INSERTS_PER_FEEDBACK $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV $MONGO_COMPRESSION $MONGO_BASEMENT $WRITE_CONCERN $MONGO_SERVER $MONGO_PORT "$USERNAME" "$PASSWORD" "$TRUST_STORE" "$TRUST_STORE_PASSWORD" $USE_TLS
+        java -cp $CLASSPATH:$PWD/src jmongosysbenchload $NUM_COLLECTIONS $DB_NAME $NUM_LOADER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_DOCUMENTS_PER_INSERT $NUM_INSERTS_PER_FEEDBACK $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV "$TRUST_STORE" "$TRUST_STORE_PASSWORD" $URI
     else
         echo "executing sharded sysbench load" | tee -a $LOG_NAME
-        java -cp $CLASSPATH:$PWD/src jmongosysbenchshardedload $NUM_COLLECTIONS $DB_NAME $NUM_LOADER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_DOCUMENTS_PER_INSERT $NUM_INSERTS_PER_FEEDBACK $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV $MONGO_COMPRESSION $MONGO_BASEMENT $WRITE_CONCERN $MONGO_SERVER $MONGO_PORT "$USERNAME" "$PASSWORD" "$TRUST_STORE" "$TRUST_STORE_PASSWORD" $USE_TLS $MAX_SHARD_KEY $DOCS_PER_SHARD
+        java -cp $CLASSPATH:$PWD/src jmongosysbenchshardedload $NUM_COLLECTIONS $DB_NAME $NUM_LOADER_THREADS $NUM_DOCUMENTS_PER_COLLECTION $NUM_DOCUMENTS_PER_INSERT $NUM_INSERTS_PER_FEEDBACK $NUM_SECONDS_PER_FEEDBACK $BENCHMARK_TSV "$TRUST_STORE" "$TRUST_STORE_PASSWORD" $MAX_SHARD_KEY $DOCS_PER_SHARD $URI
     fi
 
     echo "" | tee -a $LOG_NAME
@@ -68,7 +68,7 @@ fi
 
 if [[ $DOQUERY = "yes" ]]; then
     echo Do query at $( date )
-    export LOG_NAME=mongoSysbenchExecute-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_WRITER_THREADS}.txt
+    export LOG_NAME=mongoSysbenchExecute-${DOCDB_DBNAME}-${NUM_COLLECTIONS}-${NUM_DOCUMENTS_PER_COLLECTION}-${NUM_WRITER_THREADS}.txt
     export BENCHMARK_TSV=${LOG_NAME}.tsv
  
     rm -f $LOG_NAME
@@ -93,6 +93,6 @@ if [[ $DOQUERY = "yes" ]]; then
     echo "************************************************************************"
     tail -n $TAIL_LINES $LOG_NAME
 
-    cat $LOG_NAME | grep '170 seconds' >> results.txt
+    #cat $LOG_NAME | grep '170 seconds' >> results.txt
 fi
 
