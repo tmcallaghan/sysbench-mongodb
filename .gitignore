@@ -13,4 +13,8 @@ config.tmc.*
 clean.bash
 rds-truststore.jks
 log
+mongoSysbenchExecute*.txt
+mongoSysbenchExecute*.txt.tsv
+mongoSysbenchLoad*.txt
+mongoSysbenchLoad*.txt.tsv
 run.tmc.bash
