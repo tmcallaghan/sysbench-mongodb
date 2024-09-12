@@ -13,7 +13,7 @@ Requirements
   * wget https://oss.sonatype.org/content/repositories/releases/org/mongodb/mongo-java-driver/3.9.1/mongo-java-driver-3.9.1.jar
   * wget https://oss.sonatype.org/content/repositories/releases/org/mongodb/mongodb-driver-core/3.9.1/mongodb-driver-core-3.9.1.jar
   * wget https://oss.sonatype.org/content/repositories/releases/org/mongodb/mongodb-driver-legacy/3.9.1/mongodb-driver-legacy-3.9.1.jar
-* Modify config.bash file for credentials, server endpoint, etc.
+* Modify config.bash file for URI (connection string)
 * TLS is optional
   * If not using TLS, simply disable it in config.bash or your custom config file
   * Otherwise you'll need to create your key store file. Instructions are available at https://docs.aws.amazon.com/documentdb/latest/developerguide/connect_programmatically.html

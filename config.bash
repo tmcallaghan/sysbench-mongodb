@@ -5,25 +5,8 @@ export SHARDED=no
 # database in which to run the benchmark
 export DB_NAME=sbtest10by1mm
 
-# database username on DB_NAME
-export USERNAME=<replace-with-username>
-
-# database password to use for USERNAME
-export PASSWORD=<replace-with-password>
-
-# name of the server to connect to
-export MONGO_SERVER="<replace-with-endpoint>"
-
-# port of the server to connect to
-export MONGO_PORT=27017
-
-# read preference (replica set)
-#export MONGO_READ_PREFERENCE=primary
-export MONGO_READ_PREFERENCE=secondaryPreferred
-#export MONGO_READ_PREFERENCE=secondary
-
-# use TLS encryption (true/false)
-export USE_TLS=false
+# URI connection string
+export URI=<replace-with-proper-URI>
 
 # trust store file
 #   leave this alone if not using TLS
@@ -128,24 +111,4 @@ export NUM_INSERTS_PER_FEEDBACK=-1
 #   valid values : integer > 0, set to -1 if using NUM_INSERTS_PER_FEEDBACK
 export NUM_SECONDS_PER_FEEDBACK=10
 
-# write concern for the benchmark client
-#   valid values : FSYNC_SAFE, NONE, NORMAL, REPLICAS_SAFE, SAFE, W1, W2, W3, ACKNOWLEDGED, UNACKNOWLEDGED
-export WRITE_CONCERN=ACKNOWLEDGED
-
-
-# ------------------------------------------------------------------------------------
-# Parameters to be removed
-# ------------------------------------------------------------------------------------
-
-# if running TokuMX, need to select compression for collection and secondary indexes (zlib is default)
-#   valid values : lzma, quicklz, zlib, none
-export MONGO_COMPRESSION=zlib
-
-# if running TokuMX, need to select basement node size (65536 is default)
-#   valid values : integer > 0 : 65536 for 64K
-export MONGO_BASEMENT=65536
-
-# set to N to use begin/commit/ensure for TokuMX
-#   valid values : N or Y
-export SYSBENCH_AUTO_COMMIT=Y
 
