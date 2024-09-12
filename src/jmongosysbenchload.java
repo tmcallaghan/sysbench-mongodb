@@ -72,28 +72,6 @@ public class jmongosysbenchload {
         logMe("  Feedback every %,d seconds(s)",secondsPerFeedback);
         logMe("  Feedback every %,d inserts(s)",insertsPerFeedback);
         logMe("  logging to file %s",logFileName);
-
-	/*
-        MongoClientOptions clientOptions = new MongoClientOptions.Builder().connectionsPerHost(2048).socketTimeout(60000).writeConcern(myWC).build();
-        ServerAddress srvrAdd = new ServerAddress(serverName,serverPort);
-
-        // Credential login is optional.
-        MongoClient m;
-        if (userName.isEmpty() || userName.equalsIgnoreCase("none")) {
-            m = new MongoClient(srvrAdd);
-        } else {
-            MongoCredential credential = MongoCredential.createCredential(userName, dbName, passWord.toCharArray());
-            m = new MongoClient(srvrAdd, Arrays.asList(credential));
-        }
-		*/
-
-        //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&replicaSet=rs0&readpreference=%s";
-	//String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000";
-        //String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000&replicaSet=rs0&w=3&journal=true";
-	//String template = "mongodb://%s:%s@%s:%s/admin?ssl=%s&readpreference=%s&maxPoolSize=2000&replicaSet=rs0&w=1&journal=true";
-        //String readPreference = "secondaryPreferred";
-        //String readPreference = "primary";
-        //String connectionString = String.format(template, userName, passWord, serverName, serverPort, useSSL, readPreference);
         logMe("  connection string = %s",connectionString);
 
         //if (useSSL.equals("true")) {
@@ -102,9 +80,6 @@ public class jmongosysbenchload {
 	//	}
 
         MongoClient m = new MongoClient(new MongoClientURI(connectionString));
-
-        //logMe("mongoOptions | " + m.getMongoOptions().toString());
-        //logMe("mongoWriteConcern | " + m.getWriteConcern().toString());
 
         DB db = m.getDB(dbName);
 
