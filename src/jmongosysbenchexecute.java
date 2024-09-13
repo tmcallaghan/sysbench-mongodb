@@ -8,6 +8,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.mongodb.AggregationOutput;
 import com.mongodb.BasicDBObject;
 import com.mongodb.CommandResult;
@@ -100,7 +103,7 @@ public class jmongosysbenchexecute {
 	trustStorePassword = args[19];
 	connectionString = args[20];
 
-        maxThreadTPS = (maxTPS / writerThreads) + 1;
+        maxThreadTPS = (maxTPS / writerThreads);
 
         logMe("Application Parameters");
         logMe("-------------------------------------------------------------------------------------------------");
@@ -123,7 +126,11 @@ public class jmongosysbenchexecute {
         logMe("  maximum tps (global)     = %d",maxTPS);
         logMe("  maximum tps (per thread) = %d",maxThreadTPS);
         logMe("  seed                     = %d",rngSeed);
+        logMe("  uri                      = %s",connectionString);
         logMe("-------------------------------------------------------------------------------------------------");
+
+        logMe("setting mongodb driver log level to WARNING");
+	java.util.logging.Logger.getLogger("org.mongodb.driver").setLevel(Level.WARNING);
 
         MongoClient m = new MongoClient(new MongoClientURI(connectionString));
 
