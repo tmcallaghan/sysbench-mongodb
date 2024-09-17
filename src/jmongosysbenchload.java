@@ -7,6 +7,9 @@ import java.io.Writer;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.mongodb.BasicDBObject;
 import com.mongodb.CommandResult;
 import com.mongodb.DB;
@@ -80,6 +83,9 @@ public class jmongosysbenchload {
         //    System.setProperty("javax.net.ssl.trustStore", trustStore);
         //    System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
 	//	}
+
+        logMe("setting mongodb driver log level to WARNING");
+        java.util.logging.Logger.getLogger("org.mongodb.driver").setLevel(Level.WARNING);
 
         MongoClient m = new MongoClient(new MongoClientURI(connectionString));
 
