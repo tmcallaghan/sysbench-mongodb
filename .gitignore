@@ -11,6 +11,15 @@
 config.tmc
 config.tmc.*
 config.anshu.*
+config.01
+config.02
+config.03
+config.04
+config.05
+config.06
+config.07
+config.08
+config.10
 clean.bash
 rds-truststore.jks
 log
