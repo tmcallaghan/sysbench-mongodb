@@ -22,7 +22,7 @@ Requirements
 Running the benchmark
 =====================
 
-In the default configuration the benchmark creates 10 collections, each with 1 million documents. You may want to watch the size of the database relative to your memory size to ensure you are testing just a memory based workload vs a workload that is exceeding memory and utilizing disk as well. All options are configurable in config.bash (or custom config file with the same options)
+In the default configuration the benchmark creates 1 collection with 1 million documents. You may want to watch the size of the database relative to your memory size to ensure you are testing just a memory based workload vs a workload that is exceeding memory and utilizing disk as well. All options are configurable in config.bash (or custom config file with the same options)
 
 To run:
 
@@ -32,7 +32,7 @@ cd sysbench-mongodb
 
 ```
 
-Edit config.bash to match your environment. You will most likely want to change the server/port and credentials for your database.
+Edit config.bash to match your environment, you must change the URI for connecting to your server.
 
 ```bash
 ./run.simple.bash
