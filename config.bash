@@ -17,14 +17,14 @@ export TRUST_STORE="./rds-truststore.jks"
 export TRUST_STORE_PASSWORD="<replace-with-trust-store-password>"
 
 # Use "yes" to load the collections
-DOLOAD=yes
+export DOLOAD=yes
 
 # Use "yes" to execute the benchmark
-DOQUERY=yes
+export DOQUERY=yes
 
 # number of collections to create for the benchmark
 #   valid values : integer > 0
-export NUM_COLLECTIONS=10
+export NUM_COLLECTIONS=1
 
 # number of documents to maintain per collection
 #   valid values : integer > 0
@@ -40,7 +40,7 @@ export NUM_LOADER_THREADS=10
 
 # total number of simultaneous benchmark threads
 #   valid values : integer > 0
-export NUM_WRITER_THREADS=32
+export NUM_WRITER_THREADS=10
 
 # run the benchmark for this many minutes
 #   valid values : intever > 0
@@ -101,7 +101,7 @@ export SYSBENCH_INSERTS=1
 
 # Use a seed for the RNG, like $( date +%s )
 #   This can be used to repeat, or not, the sequence of keys used per test.
-SEED=$( date +%s )
+export SEED=$( date +%s )
 
 # display performance information every time the client application inserts this many documents
 #   valid values : integer > 0, set to -1 if using NUM_SECONDS_PER_FEEDBACK
