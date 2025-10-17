@@ -1,3 +1,8 @@
+<h3>*DEPRECATED*</h3>
+
+This repository is no longer maintained. A simpler Python implementation is available as [py-mongo-sysbench](https://github.com/tmcallaghan/py-mongo-sysbench)
+
+
 sysbench-mongodb
 ================
 
